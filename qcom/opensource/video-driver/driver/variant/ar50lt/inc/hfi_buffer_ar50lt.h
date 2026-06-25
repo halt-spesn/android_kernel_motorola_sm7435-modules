@@ -6,7 +6,6 @@
 #ifndef __HFI_BUFFER_AR50LT__
 #define __HFI_BUFFER_AR50LT__
 
-#include <linux/minmax.h>
 #include <linux/types.h>
 #include "hfi_property.h"
 
