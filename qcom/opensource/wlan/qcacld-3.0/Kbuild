@@ -4400,20 +4400,9 @@ endif
 # driver attached. Moreover, as the first priority, host driver will only
 # append DYNAMIC_SINGLE_CHIP to the path of firmware/mac/ini file.
 
-ifneq ($(DYNAMIC_SINGLE_CHIP),)
-ccflags-y += -DDYNAMIC_SINGLE_CHIP=\"$(DYNAMIC_SINGLE_CHIP)\"
-ifneq ($(MULTI_IF_NAME),)
-ccflags-y += -DMULTI_IF_NAME=\"$(MULTI_IF_NAME)\"
+ifneq ($(CONFIG_MULTI_IF_NAME),)
+ccflags-y += -DMULTI_IF_NAME=\"$(CONFIG_MULTI_IF_NAME)\"
 endif
-#
-else
-
-ifneq ($(MODNAME), wlan)
-CHIP_NAME ?= $(MODNAME)
-ccflags-y += -DMULTI_IF_NAME=\"$(CHIP_NAME)\"
-endif
-
-endif #DYNAMIC_SINGLE_CHIP
 
 # WLAN_HDD_ADAPTER_MAGIC must be unique for all instances of the driver on the
 # system. If it is not defined, then the host driver will use the first 4
@@ -4431,8 +4420,8 @@ else
 endif
 
 # Android wifi state control interface
-ifneq ($(WLAN_CTRL_NAME),)
-ccflags-y += -DWLAN_CTRL_NAME=\"$(WLAN_CTRL_NAME)\"
+ifneq ($(CONFIG_WLAN_CTRL_NAME),)
+ccflags-y += -DWLAN_CTRL_NAME=\"$(CONFIG_WLAN_CTRL_NAME)\"
 endif
 
 # inject some build related information

@@ -5925,16 +5925,6 @@ static void __exit cnss_exit(void)
 	cnss_debug_deinit();
 }
 
-void cnss_lock_pm_sem(struct device *dev)
-{
-}
-EXPORT_SYMBOL(cnss_lock_pm_sem);
-
-void cnss_release_pm_sem(struct device *dev)
-{
-}
-EXPORT_SYMBOL(cnss_release_pm_sem);
-
 module_init(cnss_initialize);
 module_exit(cnss_exit);
 
