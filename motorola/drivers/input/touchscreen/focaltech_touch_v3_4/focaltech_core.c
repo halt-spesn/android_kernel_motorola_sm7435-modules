@@ -87,8 +87,8 @@ struct fts_ts_data *fts_data;
 * Static function prototypes
 *****************************************************************************/
 #ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
-static int fts_ts_suspend(struct device *dev);
-static int fts_ts_resume(struct device *dev);
+static int __maybe_unused fts_ts_suspend(struct device *dev);
+static int __maybe_unused fts_ts_resume(struct device *dev);
 #endif
 
 int fts_check_cid(struct fts_ts_data *ts_data, u8 id_h)
@@ -2133,7 +2133,7 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
 }
 
 #ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
-static void fts_resume_work(struct work_struct *work)
+static void __maybe_unused fts_resume_work(struct work_struct *work)
 {
     struct fts_ts_data *ts_data = container_of(work, struct fts_ts_data,
                                   resume_work);
@@ -2649,7 +2649,7 @@ bool fts_is_fod_resume(struct fts_ts_data *ts_data)
 #endif
 
 #ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
-static int fts_ts_suspend(struct device *dev)
+static int __maybe_unused fts_ts_suspend(struct device *dev)
 {
     int ret = 0;
     struct fts_ts_data *ts_data = fts_data;
@@ -2715,7 +2715,7 @@ static int fts_ts_suspend(struct device *dev)
     return 0;
 }
 
-static int fts_ts_resume(struct device *dev)
+static int __maybe_unused fts_ts_resume(struct device *dev)
 {
     struct fts_ts_data *ts_data = fts_data;
 

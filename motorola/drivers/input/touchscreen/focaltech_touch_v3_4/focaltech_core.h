@@ -445,6 +445,11 @@ static inline int fts_upgrade_bin(char *fw_name, bool force)
     return -EPERM;
 }
 
+static inline int fts_enter_test_environment(bool test_state)
+{
+    return -EPERM;
+}
+
 /* FW upgrade */
 
 /* Other */
