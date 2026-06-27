@@ -2377,7 +2377,8 @@ static int fts_test_func_init(struct fts_ts_data *ts_data)
     int j = 0;
     u16 ic_stype = ts_data->ic_info.ids.type;
     int func_count = sizeof(test_func_list) / sizeof(struct test_funcs *);
-    struct test_funcs *func = func_count > 0 ? test_func_list[0] : NULL;
+    struct test_funcs **list = test_func_list;
+    struct test_funcs *func = func_count > 0 ? list[0] : NULL;
 #ifdef CONFIG_FTS_COMPATIBLE_WITH_GKI
     struct ftxxxx_proc *proc = NULL;
 #endif

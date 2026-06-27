@@ -2352,7 +2352,7 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
             FTS_ERROR("device-tree parse fail");
 
 #ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
-#if defined(CONFIG_DRM)
+#if defined(CONFIG_DRM) && (defined(CONFIG_DRM_PANEL_NOTIFICATIONS) || defined(CONFIG_DRM_PANEL_EVENT_NOTIFICATIONS))
 #if defined(CONFIG_DRM_PANEL)
         ret = drm_check_dt(ts_data->dev->of_node);
         if (ret) {
@@ -2479,11 +2479,6 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
         goto err_irq_req;
     }
 
-    ret = fts_fwupg_init(ts_data);
-    if (ret) {
-        FTS_ERROR("init fw upgrade fail");
-    }
-
 #ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
     if (ts_data->ts_workqueue) {
         INIT_WORK(&ts_data->resume_work, fts_resume_work);
@@ -2576,7 +2571,6 @@ static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
     fts_ex_mode_exit(ts_data);
     fts_fwdbg_exit(ts_data);
 
-    fts_fwupg_exit(ts_data);
 
 #if FTS_TEST_EN
     fts_test_exit(ts_data);

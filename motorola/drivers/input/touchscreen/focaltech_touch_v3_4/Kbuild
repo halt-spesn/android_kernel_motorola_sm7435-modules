@@ -12,7 +12,6 @@ focaltech_v3_4-objs += focaltech_ex_mode.o
 focaltech_v3_4-objs += focaltech_gesture.o
 focaltech_v3_4-objs += focaltech_esdcheck.o
 focaltech_v3_4-objs += focaltech_point_report_check.o
-focaltech_v3_4-objs += focaltech_flash.o
 focaltech_v3_4-objs += focaltech_spi.o
 focaltech_v3_4-objs += focaltech_test/focaltech_test.o
 focaltech_v3_4-objs += focaltech_test/focaltech_test_ini.o
@@ -21,14 +20,12 @@ focaltech_v3_4-objs += focaltech_debug.o
 
 ifneq ($(filter ft3681,$(CONFIG_INPUT_FOCAL_IC_NAME)),)
 	EXTRA_CFLAGS += -DCONFIG_FTS_IC_FT3681
-	focaltech_v3_4-objs += focaltech_flash/focaltech_upgrade_ft3681.o
 	focaltech_v3_4-objs += focaltech_test/supported_ic/focaltech_test_ft3681.o
 endif
 
 ifneq ($(filter ft3683g,$(CONFIG_INPUT_FOCAL_IC_NAME)),)
 	EXTRA_CFLAGS += -DCONFIG_FTS_IC_FT3683G
 	EXTRA_CFLAGS += -DCONFIG_FTS_NOISE_TEST_P2P
-	focaltech_v3_4-objs += focaltech_flash/focaltech_upgrade_ft3683g.o
 	focaltech_v3_4-objs += focaltech_test/supported_ic/focaltech_test_ft3683g.o
 endif
 
