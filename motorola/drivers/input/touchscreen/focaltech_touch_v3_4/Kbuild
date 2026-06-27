@@ -1,3 +1,7 @@
+# Force enable MMI touchscreen and DRM panel notifications
+CONFIG_INPUT_TOUCHSCREEN_MMI := y
+CONFIG_DRM_PANEL_EVENT_NOTIFICATIONS := y
+
 # add -Wall to try to catch everything we can.
 EXTRA_CFLAGS += -Wall
 EXTRA_CFLAGS += -I$(KERNEL_SRC)/../sm7435-modules/motorola/include \
