@@ -40,7 +40,7 @@
 #if defined(CONFIG_FB)
 #include <linux/notifier.h>
 #include <linux/fb.h>
-#elif defined(CONFIG_DRM)
+#elif defined(CONFIG_DRM) && (defined(CONFIG_DRM_PANEL_NOTIFICATIONS) || defined(CONFIG_DRM_PANEL_EVENT_NOTIFICATIONS))
 #if defined(CONFIG_DRM_PANEL)
 #include <drm/drm_panel.h>
 #else
@@ -2185,7 +2185,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 
     return 0;
 }
-#elif defined(CONFIG_DRM)
+#elif defined(CONFIG_DRM) && (defined(CONFIG_DRM_PANEL_NOTIFICATIONS) || defined(CONFIG_DRM_PANEL_EVENT_NOTIFICATIONS))
 #if defined(CONFIG_DRM_PANEL)
 static struct drm_panel *active_panel;
 
@@ -2502,7 +2502,7 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     if (ret) {
         FTS_ERROR("[FB]Unable to register fb_notifier: %d", ret);
     }
-#elif defined(CONFIG_DRM)
+#elif defined(CONFIG_DRM) && (defined(CONFIG_DRM_PANEL_NOTIFICATIONS) || defined(CONFIG_DRM_PANEL_EVENT_NOTIFICATIONS))
     ts_data->fb_notif.notifier_call = drm_notifier_callback;
 #if defined(CONFIG_DRM_PANEL)
     if (active_panel) {
@@ -2608,7 +2608,7 @@ static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
 #if defined(CONFIG_FB)
     if (fb_unregister_client(&ts_data->fb_notif))
         FTS_ERROR("[FB]Error occurred while unregistering fb_notifier.");
-#elif defined(CONFIG_DRM)
+#elif defined(CONFIG_DRM) && (defined(CONFIG_DRM_PANEL_NOTIFICATIONS) || defined(CONFIG_DRM_PANEL_EVENT_NOTIFICATIONS))
 #if defined(CONFIG_DRM_PANEL)
     if (active_panel)
         drm_panel_notifier_unregister(active_panel, &ts_data->fb_notif);
