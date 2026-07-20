@@ -13702,6 +13702,7 @@ struct hdd_context *hdd_context_create(struct device *dev)
 
 	hdd_ctx = hdd_cfg80211_wiphy_alloc();
 	if (!hdd_ctx) {
+		pr_err("hdd_context_create: hdd_cfg80211_wiphy_alloc failed\n");
 		ret = -ENOMEM;
 		goto err_out;
 	}
@@ -13719,6 +13720,7 @@ struct hdd_context *hdd_context_create(struct device *dev)
 
 	hdd_ctx->config = qdf_mem_malloc(sizeof(struct hdd_config));
 	if (!hdd_ctx->config) {
+		pr_err("hdd_context_create: hdd_config malloc failed\n");
 		ret = -ENOMEM;
 		goto err_free_hdd_context;
 	}
@@ -13764,16 +13766,20 @@ struct hdd_context *hdd_context_create(struct device *dev)
 
 	ret = hdd_context_init(hdd_ctx);
 
-	if (ret)
+	if (ret) {
+		pr_err("hdd_context_create: hdd_context_init failed with %d\n", ret);
 		goto err_hdd_objmgr_destroy;
+	}
 
 	if (hdd_get_conparam() == QDF_GLOBAL_EPPING_MODE)
 		goto skip_multicast_logging;
 
 	cds_set_multicast_logging(hdd_ctx->config->multicast_host_fw_msgs);
 	ret = hdd_init_netlink_services(hdd_ctx);
-	if (ret)
+	if (ret) {
+		pr_err("hdd_context_create: hdd_init_netlink_services failed with %d\n", ret);
 		goto err_deinit_hdd_context;
+	}
 
 	hdd_set_wlan_logging(hdd_ctx);
 	qdf_atomic_init(&hdd_ctx->adapter_ops_history.index);

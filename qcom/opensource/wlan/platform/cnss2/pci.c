@@ -580,7 +580,8 @@ static const struct mhi_controller_config cnss_mhi_config_genoa = {
 		CNSS_MHI_SATELLITE_EVT_COUNT,
 	.event_cfg = cnss_mhi_events,
 	.m2_no_db = true,
-#if IS_ENABLED(CONFIG_MHI_BUS_MISC)
+#if IS_ENABLED(CONFIG_MHI_BUS_MISC) && \
+(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
 	.bhie_offset = 0x0324,
 #endif
 };
@@ -8432,7 +8433,8 @@ static inline void cnss_set_standard_elf(struct cnss_pci_data *pci_priv)
 }
 #endif
 
-#if IS_ENABLED(CONFIG_MHI_BUS_MISC)
+#if IS_ENABLED(CONFIG_MHI_BUS_MISC) && \
+(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
 static int cnss_mhi_pm_runtime_get_sync(struct mhi_controller *mhi_ctrl)
 {
 	struct cnss_pci_data *pci_priv = dev_get_drvdata(mhi_ctrl->cntrl_dev);
@@ -8478,8 +8480,11 @@ static void cnss_mhi_misc_init(struct cnss_pci_data *pci_priv,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 	mhi_ctrl->fallback_fw_image = pci_priv->plat_priv->fw_fallback_name;
 #endif
+#if IS_ENABLED(CONFIG_MHI_BUS_MISC) && \
+(LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
 	mhi_ctrl->runtime_get_sync = cnss_mhi_pm_runtime_get_sync;
 	mhi_ctrl->runtime_put_autosuspend = cnss_mhi_pm_runtime_put_autosuspend;
+#endif
 	mhi_ctrl->tme_supported_image = cnss_is_tme_supported(pci_priv);
 	cnss_set_standard_elf(pci_priv);
 }

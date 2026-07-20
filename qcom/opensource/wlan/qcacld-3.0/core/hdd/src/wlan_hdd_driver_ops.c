@@ -612,6 +612,7 @@ static int __hdd_soc_probe(struct device *dev,
 	hdd_ctx = hdd_context_create(dev);
 	if (IS_ERR(hdd_ctx)) {
 		errno = PTR_ERR(hdd_ctx);
+		pr_err("__hdd_soc_probe: hdd_context_create failed with %d\n", errno);
 		goto assert_fail_count;
 	}
 
@@ -619,12 +620,15 @@ static int __hdd_soc_probe(struct device *dev,
 
 	if (status != QDF_STATUS_SUCCESS) {
 		errno = qdf_status_to_os_return(status);
+		pr_err("__hdd_soc_probe: dp_prealloc_init failed with %d\n", errno);
 		goto dp_prealloc_fail;
 	}
 
 	errno = hdd_wlan_startup(hdd_ctx);
-	if (errno)
+	if (errno) {
+		pr_err("__hdd_soc_probe: hdd_wlan_startup failed with %d\n", errno);
 		goto hdd_context_destroy;
+	}
 
 	status = hdd_psoc_create_vdevs(hdd_ctx);
 	if (QDF_IS_STATUS_ERROR(status)) {
