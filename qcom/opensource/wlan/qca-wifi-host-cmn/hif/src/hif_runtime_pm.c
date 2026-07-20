@@ -312,7 +312,6 @@ static const struct file_operations hif_pci_runtime_pm_fops = {
  */
 static void hif_runtime_pm_debugfs_create(struct hif_softc *scn)
 {
-#ifdef WLAN_OPEN_SOURCE
 	struct hif_runtime_pm_ctx *rpm_ctx = hif_bus_get_rpm_ctx(scn);
 
 	rpm_ctx->pm_dentry = qdf_debugfs_create_entry(CNSS_RUNTIME_FILE,
@@ -320,7 +319,6 @@ static void hif_runtime_pm_debugfs_create(struct hif_softc *scn)
 						      NULL,
 						      scn,
 						      &hif_pci_runtime_pm_fops);
-#endif
 }
 
 /**
@@ -331,11 +329,9 @@ static void hif_runtime_pm_debugfs_create(struct hif_softc *scn)
  */
 static void hif_runtime_pm_debugfs_remove(struct hif_softc *scn)
 {
-#ifdef WLAN_OPEN_SOURCE
 	struct hif_runtime_pm_ctx *rpm_ctx = hif_bus_get_rpm_ctx(scn);
 
 	qdf_debugfs_remove_file(rpm_ctx->pm_dentry);
-#endif
 }
 
 /**

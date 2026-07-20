@@ -23,7 +23,7 @@ KBUILD_OPTIONS += MODNAME?=wlan
 endif
 
 WLAN_CHIPSET := qca_cld3
-LOCAL_DEV_NAME := $(patsubst .%,%, \
+LOCAL_DEV_NAME := $(patsubst .%,%,\
 	$(lastword $(strip $(subst /, ,$(M)))))
 
 KBUILD_EXTRA := \
@@ -32,14 +32,16 @@ KBUILD_EXTRA := \
     MODNAME=$(WLAN_CHIPSET)_$(LOCAL_DEV_NAME) \
     DEVNAME=$(LOCAL_DEV_NAME)
 
+KBUILD_OPTIONS += \
+    KBUILD_EXTRA_SYMBOLS=$(M)/../../../dataipa/drivers/platform/msm/Module.symvers \
+    KBUILD_EXTRA_SYMBOLS+=$(M)/../../platform/Module.symvers
+
 #By default build for CLD
 WLAN_SELECT := CONFIG_QCA_CLD_WLAN=m
 KBUILD_OPTIONS += CONFIG_QCA_WIFI_ISOC=0
 KBUILD_OPTIONS += CONFIG_QCA_WIFI_2_0=1
 KBUILD_OPTIONS += $(WLAN_SELECT)
 KBUILD_OPTIONS += $(KBUILD_EXTRA) # Extra config if any
-
-KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS="$(M)/../../platform/Module.symvers $(M)/../../../dataipa/drivers/platform/msm/Module.symvers"
 endif
 
 all:

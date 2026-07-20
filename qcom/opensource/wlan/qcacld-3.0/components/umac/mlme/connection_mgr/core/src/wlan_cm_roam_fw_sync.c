@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,7 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
+#include "target_if.h"
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       void *event, uint32_t event_data_len)
@@ -560,6 +561,7 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 
 	if (roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
+	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE)) {
 		struct wlan_crypto_pmksa *pmkid_cache, *pmksa;
 
@@ -677,6 +679,8 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 					     roaming_info->pmk,
 					     roaming_info->pmk_len);
 				pmkid_cache->pmk_len = roaming_info->pmk_len;
+			} else {
+				mlme_debug("PMK not received from fw");
 			}
 
 			wlan_cm_set_psk_pmk(pdev, vdev_id,
@@ -1273,4 +1277,26 @@ QDF_STATUS wlan_cm_free_roam_synch_frame_ind(struct rso_config *rso_cfg)
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    struct element_info *assoc_ie)
+{
+	struct wmi_unified *wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	const uint8_t *ext_cap_ie;
+	struct s_ext_cap *extcap;
+
+	if (!wmi_handle)
+		return;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_infra_mbssid))
+		return;
+
+	ext_cap_ie  = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_XCAPS,
+					       assoc_ie->ptr, assoc_ie->len);
+	if (!ext_cap_ie)
+		return;
+
+	extcap = (struct s_ext_cap *)&ext_cap_ie[2];
+	extcap->multi_bssid = 1;
 }

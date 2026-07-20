@@ -16,6 +16,11 @@ endif
 ifeq ($(TARGET_BOARD_PLATFORM), monaco)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+#For old kernel versions, disable DDK bzl compilation
+ifeq ($(TARGET_KERNEL_VERSION),$(filter $(TARGET_KERNEL_VERSION),4.19 5.15))
+LOCAL_MODULE_DDK_BUILD := false
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := false
+endif
 endif
 
 ifeq ($(TARGET_BOARD_PLATFORM), pitti)
@@ -33,6 +38,21 @@ ifeq ($(TARGET_BOARD_SUFFIX),66)
 LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
+endif
+
+ifeq ($(TARGET_BOARD_PLATFORM), bengal)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
+ifeq ($(TARGET_BOARD_PLATFORM), malabar)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
+ifeq ($(TARGET_BOARD_PLATFORM), lahaina)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
 
 LOCAL_PATH := $(call my-dir)
@@ -112,7 +132,7 @@ endif # platform-sdk-version
 include $(CLEAR_VARS)
 LOCAL_MOD_NAME := wlan
 LOCAL_MODULE              := qca_cld3_$(CHIPSET).ko
-LOCAL_MODULE_KBUILD_NAME  := $(LOCAL_MOD_NAME).ko
+LOCAL_MODULE_KBUILD_NAME  := qca_cld3_$(CHIPSET).ko
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_DDK_SUBTARGET_REGEX := "all.*"
 ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)

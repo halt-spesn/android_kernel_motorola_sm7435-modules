@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1690,7 +1690,8 @@ peer_detach:
 			cdp_peer_delete(soc, vdev_id, peer_addr, bitmap);
 	}
 
-	wlan_release_peer_key_wakelock(wma->pdev, peer_mac);
+	wlan_release_peer_key_wakelock(wma->interfaces[vdev_id].vdev,
+				       peer_mac);
 	wma_remove_objmgr_peer(wma, wma->interfaces[vdev_id].vdev, peer_mac);
 
 	wma->interfaces[vdev_id].peer_count--;
@@ -2786,6 +2787,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlme_qos *qos_aggr;
 	struct vdev_mlme_obj *vdev_mlme;
 	tp_wma_handle wma_handle;
+	uint32_t offload_bitmap;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3000,6 +3002,20 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 		}
 	} else {
 		wma_err("Failed to get value for WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED, leaving unchanged");
+	}
+
+	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
+	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	    wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_apf_data_offload_support_enabled)) {
+		offload_bitmap = ucfg_pmo_get_apfv6_offload_bitmap(
+							wma_handle->psoc);
+		ret = wmi_unified_set_apf_supported_offload_bitmap_cmd(
+							wma_handle->wmi_handle,
+							vdev_id,
+							offload_bitmap);
+		if (QDF_IS_STATUS_ERROR(ret))
+			wma_err("Failed to configure APF supported offload bitmap");
 	}
 
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
@@ -3746,7 +3762,6 @@ void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
  * @shortSlotTimeSupported: short slot time
  * @llbCoexist: llbCoexist
  * @maxTxPower: max tx power
- * @bss_max_idle_period: BSS max idle period
  *
  * Return: none
  */
@@ -3754,12 +3769,12 @@ static void
 wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 			tSirMacBeaconInterval beaconInterval,
 			uint8_t dtimPeriod, uint8_t shortSlotTimeSupported,
-			uint8_t llbCoexist, int8_t maxTxPower,
-			uint16_t bss_max_idle_period)
+			uint8_t llbCoexist, int8_t maxTxPower)
 {
 	QDF_STATUS ret;
 	uint32_t slot_time;
 	struct wma_txrx_node *intr = wma->interfaces;
+	uint32_t keep_alive_period;
 
 	/* Beacon Interval setting */
 	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
@@ -3812,14 +3827,10 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 
 	/* Initialize protection mode in case of coexistence */
 	wma_update_protection_mode(wma, vdev_id, llbCoexist);
-
-	if (bss_max_idle_period)
-		wma_set_sta_keep_alive(
-				wma, vdev_id,
-				SIR_KEEP_ALIVE_NULL_PKT,
-				bss_max_idle_period,
-				NULL, NULL, NULL);
-
+	wlan_mlme_get_sta_keep_alive_period(wma->psoc,
+					    &keep_alive_period);
+	wma_set_sta_keep_alive(wma, vdev_id, SIR_KEEP_ALIVE_NULL_PKT,
+			       keep_alive_period, NULL, NULL, NULL);
 }
 
 static void wma_set_mgmt_frame_protection(tp_wma_handle wma)
@@ -3971,7 +3982,7 @@ QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id)
 				mlme_obj->proto.generic.dtim_period,
 				mlme_obj->proto.generic.slot_time,
 				mlme_obj->proto.generic.protection_mode,
-				bss_power, 0);
+				bss_power);
 
 	wma_vdev_set_he_bss_params(wma, vdev_id,
 				   &mlme_obj->proto.he_ops_info);
@@ -4270,8 +4281,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 				add_bss->dtimPeriod,
 				add_bss->shortSlotTimeSupported,
 				add_bss->llbCoexist,
-				add_bss->maxTxPower,
-				add_bss->bss_max_idle_period);
+				add_bss->maxTxPower);
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(iface->vdev);
 	if (!mlme_obj) {
@@ -4834,8 +4844,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 	wma_vdev_set_bss_params(wma, params->smesessionId,
 				iface->beaconInterval, iface->dtimPeriod,
 				iface->shortSlotTimeSupported,
-				iface->llbCoexist, maxTxPower,
-				iface->bss_max_idle_period);
+				iface->llbCoexist, maxTxPower);
 
 	params->csaOffloadEnable = 0;
 	if (wmi_service_enabled(wma->wmi_handle,

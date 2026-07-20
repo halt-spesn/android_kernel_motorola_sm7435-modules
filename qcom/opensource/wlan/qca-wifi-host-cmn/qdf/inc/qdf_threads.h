@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,6 +27,10 @@
 
 #include <qdf_types.h>
 #include "i_qdf_threads.h"
+
+/* Function declarations and documentation */
+
+typedef int (*qdf_thread_os_func)(void *data);
 
 typedef __qdf_thread_t qdf_thread_t;
 typedef QDF_STATUS (*qdf_thread_func)(void *context);
@@ -74,7 +79,7 @@ qdf_thread_t *qdf_create_thread(int (*thread_handler)(void *data), void *data,
  *
  * Return: a new qdf_thread pointer
  */
-qdf_thread_t *qdf_thread_run(qdf_thread_func callback, void *context);
+qdf_thread_t *qdf_thread_run(qdf_thread_os_func callback, void *context);
 
 /**
  * qdf_thread_join() - signal and wait for a thread to stop
@@ -197,4 +202,20 @@ bool qdf_cpumask_empty(const qdf_cpu_mask *srcp);
  */
 void qdf_cpumask_copy(qdf_cpu_mask *dstp,
 		      const qdf_cpu_mask *srcp);
+
+/**
+ * qdf_thread_cpumap_print_to_pagebuf  - copies the cpumask into the buffer
+ * either as comma-separated list of cpus or hex values of cpumask
+ * @list: indicates whether the cpumap is list or not
+ * @new_mask: the cpumask to copy
+ * @new_mask_str: the buffer to copy into
+ *
+ * This functions copies the cpu mask set for the thread by
+ * qdf_thread_set_cpus_allowed_mask() to new_mask_str
+ *
+ * Return: None
+ */
+void
+qdf_thread_cpumap_print_to_pagebuf(bool list, char *new_mask_str,
+				   qdf_cpu_mask *new_mask);
 #endif /* __QDF_THREADS_H */

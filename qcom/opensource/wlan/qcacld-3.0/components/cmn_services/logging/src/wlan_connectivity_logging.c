@@ -23,6 +23,7 @@
 #include "wlan_connectivity_logging.h"
 #include "wlan_cm_api.h"
 #include "wlan_mlme_main.h"
+#include "wlan_mlme_api.h"
 
 static struct wlan_connectivity_log_buf_data global_cl;
 
@@ -40,6 +41,9 @@ void wlan_connectivity_logging_start(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_cl_osif_cbks *osif_cbks,
 				     void *osif_cb_context)
 {
+	if (!wlan_mlme_is_vendor_roam_score_algo_set(psoc))
+		return;
+
 	global_cl.head = qdf_mem_valloc(sizeof(*global_cl.head) *
 					WLAN_MAX_LOG_RECORDS);
 	if (!global_cl.head) {
@@ -253,8 +257,6 @@ wlan_add_sae_auth_log_record(struct wlan_objmgr_vdev *vdev,
 	return wlan_add_sae_log_record_to_available_slot(mlme_priv, rec);
 }
 
-#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
-	defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 void wlan_clear_sae_auth_logs_cache(uint8_t vdev_id)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -277,7 +279,6 @@ void wlan_clear_sae_auth_logs_cache(uint8_t vdev_id)
 	qdf_mem_zero(mlme_priv->auth_log, sizeof(mlme_priv->auth_log));
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
-#endif
 
 static void
 wlan_cache_connectivity_log(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -403,6 +404,9 @@ wlan_connectivity_log_enqueue(struct wlan_log_record *new_record)
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_log_record *write_block;
 	enum QDF_OPMODE opmode;
+
+	if (!qdf_atomic_read(&global_cl.is_active))
+		return QDF_STATUS_E_FAILURE;
 
 	if (!new_record) {
 		logging_debug("NULL entry");
