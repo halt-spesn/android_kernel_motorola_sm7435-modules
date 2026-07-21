@@ -4613,8 +4613,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		if (!reinit && !unint) {
 			ret = pld_power_on(qdf_dev->dev);
 			if (ret) {
-				hdd_err("Failed to power up device; errno:%d",
-					ret);
+				pr_err("hdd_wlan_start_modules: pld_power_on failed with %d\n", ret);
 				goto release_lock;
 			}
 		}
@@ -4628,7 +4627,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 				   (reinit == true) ?  HIF_ENABLE_TYPE_REINIT :
 				   HIF_ENABLE_TYPE_PROBE);
 		if (ret) {
-			hdd_err("Failed to open hif; errno: %d", ret);
+			pr_err("hdd_wlan_start_modules: hdd_hif_open failed with %d\n", ret);
 			goto power_down;
 		}
 
@@ -4642,8 +4641,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 
 		status = ol_cds_init(qdf_dev, hif_ctx);
 		if (status != QDF_STATUS_SUCCESS) {
-			hdd_err("No Memory to Create BMI Context; status: %d",
-				status);
+			pr_err("hdd_wlan_start_modules: ol_cds_init failed with %d\n", status);
 			ret = qdf_status_to_os_return(status);
 			goto hif_close;
 		}
@@ -4675,8 +4673,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 
 		status = hdd_component_psoc_open(hdd_ctx->psoc);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("Failed to Open legacy components; status: %d",
-				status);
+			pr_err("hdd_wlan_start_modules: hdd_component_psoc_open failed with %d\n", status);
 			ret = qdf_status_to_os_return(status);
 			goto ipa_component_free;
 		}
@@ -16422,8 +16419,10 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 	qdf_nbuf_init_replenish_timer();
 
 	status = wlan_hdd_cache_chann_mutex_create(hdd_ctx);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pr_err("hdd_wlan_startup: wlan_hdd_cache_chann_mutex_create failed with %d\n", status);
 		return qdf_status_to_os_return(status);
+	}
 
 #ifdef FEATURE_WLAN_CH_AVOID
 	mutex_init(&hdd_ctx->avoid_freq_lock);
@@ -16435,20 +16434,20 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 	hdd_dp_trace_init(hdd_ctx->config);
 	errno = wlan_hdd_alloc_iface_combination_mem(hdd_ctx);
 	if (errno) {
-		hdd_err("failed to alloc iface combination mem");
+		pr_err("hdd_wlan_startup: failed to alloc iface combination mem\n");
 		goto memdump_deinit;
 	}
 
 	errno = hdd_init_regulatory_update_event(hdd_ctx);
 	if (errno) {
-		hdd_err("Failed to initialize regulatory update event; errno:%d",
+		pr_err("hdd_wlan_startup: Failed to initialize regulatory update event; errno:%d\n",
 			errno);
 		goto free_iface_comb;
 	}
 
 	errno = hdd_wlan_start_modules(hdd_ctx, false);
 	if (errno) {
-		hdd_err("Failed to start modules; errno:%d", errno);
+		pr_err("hdd_wlan_startup: Failed to start modules; errno:%d\n", errno);
 		goto free_iface_comb;
 	}
 
@@ -16458,24 +16457,27 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 	wlan_hdd_update_wiphy(hdd_ctx);
 
 	hdd_ctx->mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (!hdd_ctx->mac_handle)
+	if (!hdd_ctx->mac_handle) {
+		pr_err("hdd_wlan_startup: cds_get_context failed\n");
+		errno = -ENOMEM;
 		goto stop_modules;
+	}
 
 	errno = hdd_wiphy_init(hdd_ctx);
 	if (errno) {
-		hdd_err("Failed to initialize wiphy; errno:%d", errno);
+		pr_err("hdd_wlan_startup: Failed to initialize wiphy; errno:%d\n", errno);
 		goto stop_modules;
 	}
 
 	errno = hdd_initialize_mac_address(hdd_ctx);
 	if (errno) {
-		hdd_err("MAC initializtion failed: %d", errno);
+		pr_err("hdd_wlan_startup: MAC initializtion failed: %d\n", errno);
 		goto unregister_wiphy;
 	}
 
 	errno = register_netdevice_notifier(&hdd_netdev_notifier);
 	if (errno) {
-		hdd_err("register_netdevice_notifier failed; errno:%d", errno);
+		pr_err("hdd_wlan_startup: register_netdevice_notifier failed; errno:%d\n", errno);
 		goto unregister_wiphy;
 	}
 
@@ -16484,8 +16486,11 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 	hdd_lpass_notify_wlan_version(hdd_ctx);
 
 	status = wlansap_global_init();
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pr_err("hdd_wlan_startup: wlansap_global_init failed\n");
+		errno = qdf_status_to_os_return(status);
 		goto unregister_notifiers;
+	}
 
 	ucfg_mlme_is_imps_enabled(hdd_ctx->psoc, &is_imps_enabled);
 	hdd_set_idle_ps_config(hdd_ctx, is_imps_enabled);
