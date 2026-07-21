@@ -34,15 +34,20 @@
 #include "a_types.h"
 #include "dummy.h"
 #include "qdf_module.h"
+#ifdef FEATURE_RUNTIME_PM
+#include "hif_runtime_pm.h"
+#endif
 
 #ifdef FEATURE_RUNTIME_PM
+static struct hif_runtime_pm_ctx hif_dummy_rpm_ctx;
+
 static struct hif_runtime_pm_ctx *hif_dummy_bus_get_rpm_ctx(struct hif_softc *hif_sc)
 {
-	return NULL;
+	return &hif_dummy_rpm_ctx;
 }
 static struct device *hif_dummy_bus_get_dev(struct hif_softc *hif_sc)
 {
-	return NULL;
+	return hif_sc->qdf_dev->dev;
 }
 #endif
 
