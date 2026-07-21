@@ -97,12 +97,16 @@ int osif_psoc_sync_create(struct osif_psoc_sync **out_psoc_sync)
 	osif_psoc_sync_lock();
 	psoc_sync = osif_psoc_sync_get();
 	osif_psoc_sync_unlock();
-	if (!psoc_sync)
+	if (!psoc_sync) {
+		pr_err("osif_psoc_sync_create: osif_psoc_sync_get failed (array full)\n");
 		return -ENOMEM;
+	}
 
 	status = osif_driver_sync_dsc_psoc_create(&psoc_sync->dsc_psoc);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pr_err("osif_psoc_sync_create: dsc_psoc_create failed with %d\n", status);
 		goto sync_put;
+	}
 
 	*out_psoc_sync = psoc_sync;
 

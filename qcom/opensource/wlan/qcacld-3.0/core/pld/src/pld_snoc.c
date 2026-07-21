@@ -103,16 +103,23 @@ static int pld_snoc_probe(struct device *dev)
 
 	pld_context = pld_get_global_context();
 	if (!pld_context) {
+		pr_err("pld_snoc_probe: pld_get_global_context failed\n");
 		ret = -ENODEV;
 		goto out;
 	}
 
 	ret = pld_add_dev(pld_context, dev, NULL, PLD_BUS_TYPE_SNOC);
-	if (ret)
+	if (ret) {
+		pr_err("pld_snoc_probe: pld_add_dev failed with %d\n", ret);
 		goto out;
+	}
 
-	return pld_context->ops->probe(dev, PLD_BUS_TYPE_SNOC,
+	ret = pld_context->ops->probe(dev, PLD_BUS_TYPE_SNOC,
 				       NULL, NULL);
+	if (ret)
+		pr_err("pld_snoc_probe: ops->probe failed with %d\n", ret);
+
+	return ret;
 
 out:
 	return ret;

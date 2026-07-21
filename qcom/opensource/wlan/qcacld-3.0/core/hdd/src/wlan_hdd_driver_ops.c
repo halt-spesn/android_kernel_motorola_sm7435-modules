@@ -694,13 +694,17 @@ static int hdd_soc_probe(struct device *dev,
 	hdd_info("probing driver");
 
 	errno = osif_psoc_sync_create_and_trans(&psoc_sync);
-	if (errno)
+	if (errno) {
+		pr_err("hdd_soc_probe: osif_psoc_sync_create_and_trans failed with %d\n", errno);
 		return errno;
+	}
 
 	osif_psoc_sync_register(dev, psoc_sync);
 	errno = __hdd_soc_probe(dev, bdev, bid, bus_type);
-	if (errno)
+	if (errno) {
+		pr_err("hdd_soc_probe: __hdd_soc_probe failed with %d\n", errno);
 		goto destroy_sync;
+	}
 
 	osif_psoc_sync_trans_stop(psoc_sync);
 
@@ -1780,13 +1784,18 @@ static int wlan_hdd_pld_probe(struct device *dev,
 			      void *id)
 {
 	enum qdf_bus_type bus_type = to_bus_type(pld_bus_type);
+	int ret;
 
 	if (bus_type == QDF_BUS_TYPE_NONE) {
 		hdd_err("Invalid bus type %d->%d", pld_bus_type, bus_type);
 		return -EINVAL;
 	}
 
-	return hdd_soc_probe(dev, bdev, id, bus_type);
+	ret = hdd_soc_probe(dev, bdev, id, bus_type);
+	if (ret)
+		pr_err("wlan_hdd_pld_probe: hdd_soc_probe failed with %d\n", ret);
+
+	return ret;
 }
 
 /**

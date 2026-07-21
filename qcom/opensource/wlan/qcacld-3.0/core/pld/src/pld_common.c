@@ -206,8 +206,10 @@ int pld_add_dev(struct pld_context *pld_context,
 	struct dev_node *dev_node;
 
 	dev_node = kzalloc(sizeof(*dev_node), GFP_KERNEL);
-	if (!dev_node)
+	if (!dev_node) {
+		pr_err("pld_add_dev: kzalloc failed\n");
 		return -ENOMEM;
+	}
 
 	dev_node->dev = dev;
 	dev_node->ifdev = ifdev;
