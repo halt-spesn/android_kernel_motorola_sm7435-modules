@@ -1017,13 +1017,15 @@ struct hif_opaque_softc *hif_open(qdf_device_t qdf_ctx,
 	int bus_context_size = hif_bus_get_context_size(bus_type);
 
 	if (bus_context_size == 0) {
-		hif_err("context size 0 not allowed");
+		pr_err("hif_open: context size 0 not allowed (bus_type=%d)\n", bus_type);
 		return NULL;
 	}
 
 	scn = (struct hif_softc *)qdf_mem_malloc(bus_context_size);
-	if (!scn)
+	if (!scn) {
+		pr_err("hif_open: qdf_mem_malloc failed for size %d\n", bus_context_size);
 		return GET_HIF_OPAQUE_HDL(scn);
+	}
 
 	scn->qdf_dev = qdf_ctx;
 	scn->hif_con_param = mode;
@@ -1044,8 +1046,7 @@ struct hif_opaque_softc *hif_open(qdf_device_t qdf_ctx,
 	hif_set_event_hist_mask(GET_HIF_OPAQUE_HDL(scn));
 	status = hif_bus_open(scn, bus_type);
 	if (status != QDF_STATUS_SUCCESS) {
-		hif_err("hif_bus_open error = %d, bus_type = %d",
-			status, bus_type);
+		pr_err("hif_open: hif_bus_open failed with %d, bus_type = %d\n", status, bus_type);
 		qdf_mem_free(scn);
 		scn = NULL;
 		goto out;

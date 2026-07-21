@@ -390,19 +390,19 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 
 	hif_ctx = hif_open(qdf_ctx, mode, bus_type, &cbk, hdd_ctx->psoc);
 	if (!hif_ctx) {
-		hdd_err("hif_open error");
+		pr_err("hdd_hif_open: hif_open returned NULL\n");
 		return -ENOMEM;
 	}
 
 	ret = hdd_init_cds_hif_context(hif_ctx);
 	if (ret) {
-		hdd_err("Failed to set global HIF CDS Context err: %d", ret);
+		pr_err("hdd_hif_open: Failed to set global HIF CDS Context err: %d\n", ret);
 		goto err_hif_close;
 	}
 
 	status = hdd_hif_register_shutdown_notifier(hif_ctx);
 	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("Shutdown notifier register failed: %d", status);
+		pr_err("hdd_hif_open: Shutdown notifier register failed: %d\n", status);
 		goto err_deinit_hif_context;
 	}
 
@@ -412,7 +412,7 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 			    (reinit == true) ?  HIF_ENABLE_TYPE_REINIT :
 			    HIF_ENABLE_TYPE_PROBE);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("hif_enable failed status: %d, reinit: %d",
+		pr_err("hdd_hif_open: hif_enable failed status: %d, reinit: %d\n",
 			status, reinit);
 
 		ret = qdf_status_to_os_return(status);

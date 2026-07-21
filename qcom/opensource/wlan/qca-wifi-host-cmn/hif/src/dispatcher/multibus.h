@@ -122,6 +122,7 @@ static inline QDF_STATUS hif_initialize_snoc_ops(struct hif_bus_ops *hif_sc)
  */
 static inline int hif_snoc_get_context_size(void)
 {
+	pr_err("hif_snoc_get_context_size: SNOC is NOT supported in this build!\n");
 	return 0;
 }
 #endif /* HIF_SNOC */
