@@ -35,6 +35,17 @@
 #include "dummy.h"
 #include "qdf_module.h"
 
+#ifdef FEATURE_RUNTIME_PM
+static struct hif_runtime_pm_ctx *hif_dummy_bus_get_rpm_ctx(struct hif_softc *hif_sc)
+{
+	return NULL;
+}
+static struct device *hif_dummy_bus_get_dev(struct hif_softc *hif_sc)
+{
+	return NULL;
+}
+#endif
+
 /**
  * hif_initialize_default_ops() - initializes default operations values
  *
@@ -70,6 +81,10 @@ static void hif_initialize_default_ops(struct hif_softc *hif_sc)
 #ifdef FEATURE_IRQ_AFFINITY
 	bus_ops->hif_set_grp_intr_affinity = &hif_dummy_set_grp_intr_affinity;
 #endif
+#ifdef FEATURE_RUNTIME_PM
+	bus_ops->hif_bus_get_rpm_ctx = &hif_dummy_bus_get_rpm_ctx;
+	bus_ops->hif_bus_get_dev = &hif_dummy_bus_get_dev;
+#endif
 }
 
 #define NUM_OPS (sizeof(struct hif_bus_ops) / sizeof(void *))
@@ -92,7 +107,7 @@ static QDF_STATUS hif_verify_basic_ops(struct hif_softc *hif_sc)
 
 	for (i = 0; i < NUM_OPS; i++) {
 		if (!ops_array[i]) {
-			hif_err("ops_array[%d] is null", i);
+			pr_err("hif_verify_basic_ops: ops_array[%d] is null\n", i);
 			status = QDF_STATUS_E_NOSUPPORT;
 		}
 	}
