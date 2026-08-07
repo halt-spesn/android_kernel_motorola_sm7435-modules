@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ipa_i.h"
@@ -84,6 +84,17 @@ int ipa3_wigig_init_i(void)
 	IPADBG("\n");
 
 	ipa3_uc_register_ready_cb(&uc_loaded_notifier);
+
+	IPADBG("exit\n");
+
+	return 0;
+}
+
+int ipa3_wigig_deinit_i(void)
+{
+	IPADBG("\n");
+
+	ipa3_uc_unregister_ready_cb(&uc_loaded_notifier);
 
 	IPADBG("exit\n");
 
@@ -676,9 +687,9 @@ static int ipa3_wigig_config_gsi(bool Rx,
 	memset(&gsi_scratch, 0, sizeof(gsi_scratch));
 
 	if (Rx)
-		channel_props.dir = GSI_CHAN_DIR_TO_GSI;
+		channel_props.dir = CHAN_DIR_TO_GSI;
 	else
-		channel_props.dir = GSI_CHAN_DIR_FROM_GSI;
+		channel_props.dir = CHAN_DIR_FROM_GSI;
 
 	channel_props.re_size = GSI_CHAN_RE_SIZE_16B;
 	channel_props.prot = GSI_CHAN_PROT_11AD;

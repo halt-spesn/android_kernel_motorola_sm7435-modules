@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.​
  */
 
 #undef TRACE_SYSTEM
@@ -257,12 +257,12 @@ TRACE_EVENT(
 TRACE_EVENT(
 	ipa_tx_dp,
 
-	TP_PROTO(const struct sk_buff *skb, unsigned long client),
+	TP_PROTO(const struct sk_buff *skb, const char *devname, unsigned long client),
 
-	TP_ARGS(skb, client),
+	TP_ARGS(skb, devname, client),
 
 	TP_STRUCT__entry(
-		__string(name,			skb->dev->name)
+		__string(name,			devname)
 		__field(const void *,	skbaddr)
 		__field(u16,			protocol)
 		__field(unsigned int,	len)
@@ -394,7 +394,7 @@ TRACE_EVENT(
 /* This part must be outside protection */
 #ifndef IPA_TRACE_INCLUDE_PATH
 #ifdef CONFIG_IPA_VENDOR_DLKM
-#define IPA_TRACE_INCLUDE_PATH ../../../../sm7435-modules/qcom/opensource/dataipa/drivers/platform/msm/ipa/ipa_v3
+#define IPA_TRACE_INCLUDE_PATH ../../../../sm6475-modules/qcom/opensource/dataipa/drivers/platform/msm/ipa/ipa_v3
 #else
 #define IPA_TRACE_INCLUDE_PATH ../../techpack/dataipa/drivers/platform/msm/ipa/ipa_v3
 #endif

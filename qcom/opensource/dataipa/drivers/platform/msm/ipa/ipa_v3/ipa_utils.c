@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <net/ip.h>
@@ -8274,7 +8275,7 @@ void ipa_init_ep_flt_bitmap(void)
 	hw_idx = ipa3_ctx->hw_type_index;
 	bitmap = 0;
 	if (ipa3_ctx->ep_flt_bitmap) {
-		WARN_ON(1);
+		IPADBG("EP Filter bitmap is already initialized\n");
 		return;
 	}
 
@@ -10670,9 +10671,6 @@ static void ipa3_tag_free_skb(void *user1, int user2)
 }
 
 #define REQUIRED_TAG_PROCESS_DESCRIPTORS 4
-#define MAX_RETRY_ALLOC 10
-#define ALLOC_MIN_SLEEP_RX 100000
-#define ALLOC_MAX_SLEEP_RX 200000
 
 /* ipa3_tag_process() - Initiates a tag process. Incorporates the input
  * descriptors
@@ -10707,6 +10705,7 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 	int req_num_tag_desc = REQUIRED_TAG_PROCESS_DESCRIPTORS;
 	struct ipa_mem_buffer cmd;
 	u32 offset = 0;
+	uint8_t retry_count = 0;
 
 	memset(&cmd, 0, sizeof(struct ipa_mem_buffer));
 	/**
@@ -10733,7 +10732,12 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 	}
 	sys = ipa3_ctx->ep[ep_idx].sys;
 
-	tag_desc = kzalloc(sizeof(*tag_desc) * IPA_TAG_MAX_DESC, GFP_KERNEL);
+	for (retry_count = 0; retry_count < MAX_RETRY_ALLOC; retry_count++) {
+		tag_desc = kzalloc(sizeof(*tag_desc) * IPA_TAG_MAX_DESC, GFP_KERNEL);
+		if (tag_desc)
+			break;
+		usleep_range(ALLOC_MIN_SLEEP_RX, ALLOC_MAX_SLEEP_RX);
+	}
 	if (!tag_desc) {
 		IPAERR("failed to allocate memory\n");
 		return -ENOMEM;
@@ -10774,7 +10778,7 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 			&reg_write_coal_close, false);
 		if (!cmd_pyld) {
 			IPAERR("failed to construct coal close IC\n");
-			res = -ENOMEM;
+			res = -EINVAL;
 			goto fail_free_tag_desc;
 		}
 		ipa3_init_imm_cmd_desc(&tag_desc[desc_idx], cmd_pyld);
@@ -10785,8 +10789,13 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 	if (ipa3_ctx->ulso_wa) {
 		/* dummary regsiter read IC with HPS clear*/
 		cmd.size = 4;
-		cmd.base = dma_alloc_coherent(ipa3_ctx->pdev, cmd.size,
-			&cmd.phys_base, GFP_KERNEL);
+		for (retry_count = 0; retry_count < MAX_RETRY_ALLOC; retry_count++) {
+			cmd.base = dma_alloc_coherent(ipa3_ctx->pdev, cmd.size,
+				&cmd.phys_base, GFP_KERNEL);
+			if (cmd.base)
+				break;
+			usleep_range(ALLOC_MIN_SLEEP_RX, ALLOC_MAX_SLEEP_RX);
+		}
 		if (cmd.base == NULL) {
 			res = -ENOMEM;
 			goto fail_free_desc;
@@ -10802,7 +10811,7 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 			&dummy_reg_read, false);
 		if (!cmd_pyld) {
 			IPAERR("failed to construct DUMMY READ IC\n");
-			res = -ENOMEM;
+			res = -EINVAL;
 			goto fail_free_desc;
 		}
 		ipa3_init_imm_cmd_desc(&tag_desc[desc_idx], cmd_pyld);
@@ -10834,7 +10843,7 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 		IPA_IMM_CMD_IP_PACKET_INIT, &pktinit_cmd, false);
 	if (!cmd_pyld) {
 		IPAERR("failed to construct ip_packet_init imm cmd\n");
-		res = -ENOMEM;
+		res = -EINVAL;
 		goto fail_free_desc;
 	}
 	ipa3_init_imm_cmd_desc(&tag_desc[desc_idx], cmd_pyld);
@@ -10848,7 +10857,7 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 		IPA_IMM_CMD_IP_PACKET_TAG_STATUS, &status, false);
 	if (!cmd_pyld) {
 		IPAERR("failed to construct ip_packet_tag_status imm cmd\n");
-		res = -ENOMEM;
+		res = -EINVAL;
 		goto fail_free_desc;
 	}
 	ipa3_init_imm_cmd_desc(&tag_desc[desc_idx], cmd_pyld);
@@ -10856,7 +10865,12 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 	tag_desc[desc_idx].user1 = cmd_pyld;
 	++desc_idx;
 
-	comp = kzalloc(sizeof(*comp), GFP_KERNEL);
+	for (retry_count = 0; retry_count < MAX_RETRY_ALLOC; retry_count++) {
+		comp = kzalloc(sizeof(*comp), GFP_KERNEL);
+		if (comp)
+			break;
+		usleep_range(ALLOC_MIN_SLEEP_RX, ALLOC_MAX_SLEEP_RX);
+	}
 	if (!comp) {
 		IPAERR("no mem\n");
 		res = -ENOMEM;
@@ -10868,7 +10882,12 @@ int ipa3_tag_process(struct ipa3_desc desc[],
 	atomic_set(&comp->cnt, 2);
 
 	/* dummy packet to send to IPA. packet payload is a completion object */
-	dummy_skb = alloc_skb(sizeof(comp), GFP_KERNEL);
+	for (retry_count = 0; retry_count < MAX_RETRY_ALLOC; retry_count++) {
+		dummy_skb = alloc_skb(sizeof(comp), GFP_KERNEL);
+		if (dummy_skb)
+			break;
+		usleep_range(ALLOC_MIN_SLEEP_RX, ALLOC_MAX_SLEEP_RX);
+	}
 	if (!dummy_skb) {
 		IPAERR("failed to allocate memory\n");
 		res = -ENOMEM;
@@ -12320,6 +12339,7 @@ static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 	int ipa_ep_idx, wan_coal_ep_idx, lan_coal_ep_idx;
 	struct ipa3_ep_context *ep;
 	int res;
+	struct ipa_ep_cfg_holb holb_cfg;
 
 	ipa_ep_idx = ipa_get_ep_mapping(client);
 	if (ipa_ep_idx < 0) {
@@ -12366,6 +12386,28 @@ static int _ipa_suspend_resume_pipe(enum ipa_client_type client, bool suspend)
 		if (res) {
 			IPAERR("failed to start LAN channel\n");
 			ipa_assert();
+		}
+	}
+
+	if ((ipa3_ctx->ipa_hw_type >= IPA_HW_v5_2 && client == IPA_CLIENT_APPS_WAN_CONS)
+			|| (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5 &&
+			 client == IPA_CLIENT_APPS_WAN_COAL_CONS) ||
+			client == IPA_CLIENT_ODL_DPL_CONS) {
+		ipa_ep_idx = ipa_get_ep_mapping(client);
+		if (ipa_ep_idx != IPA_EP_NOT_ALLOCATED && ipa3_ctx->ep[ipa_ep_idx].valid) {
+			memset(&holb_cfg, 0, sizeof(holb_cfg));
+			if (suspend)
+				holb_cfg.en = 0;
+			else
+				holb_cfg.en = 1;
+			IPADBG("Endpoint = %d HOLB mode = %d\n", ipa_ep_idx, holb_cfg.en);
+			ipahal_write_reg_n_fields(IPA_ENDP_INIT_HOL_BLOCK_EN_n,
+					ipa_ep_idx, &holb_cfg);
+			/* IPA4.5 issue requires HOLB_EN to be written twice */
+			if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5 && holb_cfg.en)
+				ipahal_write_reg_n_fields(
+						IPA_ENDP_INIT_HOL_BLOCK_EN_n,
+						ipa_ep_idx, &holb_cfg);
 		}
 	}
 
@@ -12455,8 +12497,6 @@ void ipa3_force_close_coal(
 int ipa3_suspend_apps_pipes(bool suspend)
 {
 	int res, i;
-	struct ipa_ep_cfg_holb holb_cfg;
-	int odl_ep_idx;
 
 	if (suspend) {
 		stop_coalescing();
@@ -12496,24 +12536,6 @@ int ipa3_suspend_apps_pipes(bool suspend)
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_ODL_DPL_CONS, suspend);
 	if (res == -EAGAIN) {
 		goto undo_odl_cons;
-	}
-
-	odl_ep_idx = ipa_get_ep_mapping(IPA_CLIENT_ODL_DPL_CONS);
-	if (odl_ep_idx != IPA_EP_NOT_ALLOCATED && ipa3_ctx->ep[odl_ep_idx].valid) {
-		memset(&holb_cfg, 0, sizeof(holb_cfg));
-		if (suspend)
-			holb_cfg.en = 0;
-		else
-			holb_cfg.en = 1;
-
-		ipahal_write_reg_n_fields(IPA_ENDP_INIT_HOL_BLOCK_EN_n,
-				odl_ep_idx, &holb_cfg);
-		/* IPA4.5 issue requires HOLB_EN to be written twice */
-		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5 && holb_cfg.en)
-			ipahal_write_reg_n_fields(
-					IPA_ENDP_INIT_HOL_BLOCK_EN_n,
-					odl_ep_idx, &holb_cfg);
-
 	}
 
 	res = _ipa_suspend_resume_pipe(IPA_CLIENT_APPS_WAN_LOW_LAT_CONS,

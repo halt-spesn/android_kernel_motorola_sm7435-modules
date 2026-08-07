@@ -18,6 +18,7 @@
 #include <linux/ipc_logging.h>
 #include <linux/iommu.h>
 #include <linux/msi.h>
+#include <linux/ipa_usb.h>
 
 /*
  * The following for adding code (ie. for EMULATION) not found on x86.
@@ -541,7 +542,7 @@ enum gsi_chan_use_db_eng {
  */
 struct gsi_chan_props {
 	enum gsi_chan_prot prot;
-	enum gsi_chan_dir dir;
+	enum ipa_usb_gsi_chan_dir dir;
 	uint8_t ch_id;
 	unsigned long evt_ring_hdl;
 	enum gsi_chan_ring_elem_size re_size;
@@ -2600,5 +2601,7 @@ uint32_t gsi_get_evt_ring_len(int evt_hdl);
 int gsi_get_peripheral_ee(void);
 
 uint32_t gsi_get_chan_stop_stm(int chan_id, int ee);
+
+uint32_t gsi_get_outstanding_buffers(int ep_idx);
 
 #endif

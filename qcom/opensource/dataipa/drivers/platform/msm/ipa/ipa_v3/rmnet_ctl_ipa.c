@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/string.h>
@@ -449,8 +450,8 @@ int ipa3_teardown_apps_low_lat_pipes(void)
 		ret = ipa_teardown_sys_pipe(
 			rmnet_ctl_ipa3_ctx->apps_to_ipa3_low_lat_hdl);
 		if (ret < 0) {
-			return ret;
 			IPAERR("Failed to teardown APPS->IPA low lat pipe\n");
+			return ret;
 		}
 		rmnet_ctl_ipa3_ctx->apps_to_ipa3_low_lat_hdl = -1;
 		rmnet_ctl_ipa3_ctx->pipe_state &= ~IPA_RMNET_CTL_PIPE_TX_READY;
@@ -503,6 +504,9 @@ int ipa_rmnet_ctl_xmit(struct sk_buff *skb)
 			flags);
 		return 0;
 	}
+
+	if (atomic_read(&ipa3_ctx->is_suspend_mode_enabled))
+		IPAERR("User %s sent data in suspend mode.\n", current->comm);
 
 	/* rmnet_ctl is calling from atomic context */
 	ret = ipa_pm_activate(rmnet_ctl_ipa3_ctx->rmnet_ctl_pm_hdl);

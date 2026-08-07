@@ -1337,8 +1337,10 @@ static int __ipa_wwan_open(struct net_device *dev)
 		reinit_completion(&wwan_ptr->resource_granted_completion);
 	wwan_ptr->device_status = WWAN_DEVICE_ACTIVE;
 
-	if (ipa3_rmnet_res.ipa_napi_enable)
+	if (ipa3_rmnet_res.ipa_napi_enable) {
 		napi_enable(&(wwan_ptr->napi));
+		ipa3_ctx->rmnet_napi_enable = true;
+	}
 	return 0;
 }
 
@@ -1496,6 +1498,9 @@ static netdev_tx_t ipa3_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 send:
+	if (atomic_read(&ipa3_ctx->is_suspend_mode_enabled))
+		IPAWANERR("User %s sent data in suspend mode.\n", current->comm);
+
 	/* IPA_PM checking start */
 	/* activate the modem pm for clock scaling */
 	ipa_pm_activate(rmnet_ipa3_ctx->q6_pm_hdl);
@@ -3701,6 +3706,7 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 		egress_pipe_status[j].status = 0;
 	}
 
+	ipa3_ctx->rmnet_napi_enable = false;
 	IPAWANERR("rmnet_ipa completed initialization\n");
 	return 0;
 config_err:

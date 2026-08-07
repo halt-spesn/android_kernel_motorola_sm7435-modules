@@ -53,7 +53,7 @@ endif
 
 WLAN_PLATFORM_ROOT := $(WLAN_ROOT)/../platform
 
-ifneq (,$(filter y, $(CONFIG_ARCH_PARROT) $(CONFIG_ARCH_RAVELIN)))
+ifeq ($(CONFIG_ARCH_PARROT), y)
 CONFIG_QCA_CLD_WLAN_PROFILE=parrot_gki_$(WLAN_PROFILE)
 
 include \
@@ -251,10 +251,6 @@ ifeq ($(CONFIG_WLAN_SYNC_TSF), y)
 HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_tsf.o
 endif
 
-ifeq ($(CONFIG_MPC_UT_FRAMEWORK), y)
-HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_conc_ut.o
-endif
-
 ifeq ($(CONFIG_WLAN_FEATURE_DISA), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_disa.o
 endif
@@ -447,7 +443,10 @@ endif
 ifeq ($(CONFIG_WLAN_FREQ_LIST), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_freq_for_pwr.o
 endif
+ifeq ($(CONFIG_WLAN_SYSFS_BITRATES), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_bitrates.o
 endif
+endif # CONFIG_WLAN_SYSFS
 ifeq ($(CONFIG_WLAN_SYSFS_DP_STATS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_txrx_stats_console.o
 endif
@@ -1252,7 +1251,7 @@ FTM_OBJS := $(FTM_DISP_SRC)/wlan_ftm_init_deinit.o \
 	    $(FTM_CORE_SRC)/wlan_ftm_svc.o \
 	    $(TARGET_IF_FTM_SRC)/target_if_ftm.o
 
-ifneq (,$(filter y, $(QCA_WIFI_FTM_NL80211) $(CONFIG_QCA_WIFI_FTM_NL80211)))
+ifeq ($(CONFIG_QCA_WIFI_FTM_NL80211), y)
 FTM_OBJS += $(OS_IF_FTM_SRC)/wlan_cfg80211_ftm.o
 endif
 
@@ -3393,6 +3392,7 @@ cppflags-$(CONFIG_DEBUG_RX_RING_BUFFER) += -DDEBUG_RX_RING_BUFFER
 cppflags-$(CONFIG_DESC_TIMESTAMP_DEBUG_INFO) += -DDESC_TIMESTAMP_DEBUG_INFO
 
 cppflags-$(CONFIG_PANIC_ON_BUG) += -DPANIC_ON_BUG
+
 cppflags-$(CONFIG_WLAN_WARN_ON_ASSERT) += -DWLAN_WARN_ON_ASSERT
 
 ccflags-$(CONFIG_POWER_MANAGEMENT_OFFLOAD) += -DWLAN_POWER_MANAGEMENT_OFFLOAD
@@ -3419,6 +3419,7 @@ cppflags-$(CONFIG_WLAN_SYSFS_CHANNEL) += -DWLAN_SYSFS_CHANNEL
 cppflags-$(CONFIG_FEATURE_BECN_STATS) += -DWLAN_FEATURE_BEACON_RECEPTION_STATS
 
 cppflags-$(CONFIG_WLAN_SYSFS_CONNECT_INFO) += -DWLAN_SYSFS_CONNECT_INFO
+cppflags-$(CONFIG_WLAN_SYSFS_BITRATES) += -DWLAN_SYSFS_BITRATES
 
 #Set RX_PERFORMANCE
 cppflags-$(CONFIG_RX_PERFORMANCE) += -DRX_PERFORMANCE
@@ -4363,6 +4364,9 @@ cppflags-$(CONFIG_WLAN_FEATURE_COAP) += -DWLAN_FEATURE_COAP
 ifeq ($(CONFIG_FEATURE_COEX_TPUT_SHAPING_ENABLE), y)
 cppflags-y += -DFEATURE_COEX_TPUT_SHAPING_CONFIG
 endif
+
+# CPU Boosting for roaming
+ccflags-$(CONFIG_WLAN_BOOST_CPU_FREQ_IN_ROAM) += -DWLAN_BOOST_CPU_FREQ_IN_ROAM
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

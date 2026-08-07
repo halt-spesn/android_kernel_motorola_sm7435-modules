@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -60,6 +60,9 @@
 #define GSI_NTN3_PENDING_DB_AFTER_RB_SHIFT 1
 /* FOR_SEQ_HIGH channel scratch: (((8 * (pipe_id * ctx_size + offset_lines)) + 4) / 4) */
 #define GSI_GSI_SHRAM_n_EP_FOR_SEQ_HIGH_N_GET(ep_id) (((8 * (ep_id * 10 + 9)) + 4) / 4)
+
+#define IPA_GSI_OFFSET_WORDS_SCRATCH_FOR_SEQ_HIGH_5_5 19
+#define IPA_NUM_BYTES_PER_CHNL_SHRAM_5_5 20
 
 #ifndef CONFIG_DEBUG_FS
 void gsi_debugfs_init(void)
@@ -703,7 +706,7 @@ static void gsi_process_chan(struct gsi_xfer_compl_evt *evt,
 		 * Increment RP local only in polling context to avoid
 		 * sys len mismatch.
 		 */
-		if (!callback || (ch_ctx->props.dir == GSI_CHAN_DIR_TO_GSI &&
+		if (!callback || (ch_ctx->props.dir == CHAN_DIR_TO_GSI &&
 			!ch_ctx->props.tx_poll))
 			/* the element at RP is also processed */
 			gsi_incr_ring_rp(&ch_ctx->ring);
@@ -726,7 +729,7 @@ static void gsi_process_chan(struct gsi_xfer_compl_evt *evt,
 	 * channel will receive the IEOB interrupt and xfer pointer will be
 	 * overwritten. To avoid this process all data in polling context.
 	 */
-	if (!callback || (ch_ctx->props.dir == GSI_CHAN_DIR_TO_GSI &&
+	if (!callback || (ch_ctx->props.dir == CHAN_DIR_TO_GSI &&
 		!ch_ctx->props.tx_poll)) {
 		ch_ctx->stats.completed++;
 		ch_ctx->user_data[rp_idx].valid = false;
@@ -764,7 +767,7 @@ static void gsi_process_evt_re(struct gsi_evt_ctx *ctx,
 	 * sys len mismatch.
 	 */
 	ch_ctx = &gsi_ctx->chan[evt->chid];
-	if (callback && (ch_ctx->props.dir == GSI_CHAN_DIR_FROM_GSI ||
+	if (callback && (ch_ctx->props.dir == CHAN_DIR_FROM_GSI ||
 		ch_ctx->props.tx_poll))
 		return;
 	gsi_incr_ring_rp(&ctx->ring);
@@ -801,7 +804,7 @@ static void gsi_ring_chan_doorbell(struct gsi_chan_ctx *ctx)
 	 * for TO_GSI channels the event ring doorbell is rang as part of
 	 * interrupt handling.
 	 */
-	if (ctx->evtr && ctx->props.dir == GSI_CHAN_DIR_FROM_GSI)
+	if (ctx->evtr && ctx->props.dir == CHAN_DIR_FROM_GSI)
 		gsi_ring_evt_doorbell(ctx->evtr);
 	ctx->ring.wp = ctx->ring.wp_local;
 
@@ -2128,8 +2131,10 @@ static int gsi_cleanup_xfer_user_data(unsigned long chan_hdl,
 			rp_idx = gsi_find_idx_from_addr(&ctx->ring,
 				ctx->ring.rp_local);
 			WARN_ON(!ctx->user_data[rp_idx].valid);
-			cleanup_cb(ctx->props.chan_user_data,
-				ctx->user_data[rp_idx].p);
+			if (ctx->user_data[rp_idx].valid) {
+				cleanup_cb(ctx->props.chan_user_data,
+					ctx->user_data[rp_idx].p);
+			}
 			gsi_incr_ring_rp(&ctx->ring);
 		}
 	}
@@ -3839,7 +3844,7 @@ revrfy_chnlstate:
 		reset_done = true;
 
 	/* workaround: reset GSI producers again */
-	if (ctx->props.dir == GSI_CHAN_DIR_FROM_GSI && !reset_done) {
+	if (ctx->props.dir == CHAN_DIR_FROM_GSI && !reset_done) {
 		usleep_range(GSI_RESET_WA_MIN_SLEEP, GSI_RESET_WA_MAX_SLEEP);
 		reset_done = true;
 		goto reset;
@@ -4127,7 +4132,7 @@ int gsi_is_channel_empty(unsigned long chan_hdl, bool *is_empty)
 
 	spin_lock_irqsave(slock, flags);
 
-	if (ctx->props.dir == GSI_CHAN_DIR_FROM_GSI && ctx->evtr) {
+	if (ctx->props.dir == CHAN_DIR_FROM_GSI && ctx->evtr) {
 		ev_ctx = &gsi_ctx->evtr[ctx->evtr->id];
 		/* Read the event ring rp from DDR to avoid mismatch */
 		rp = ev_ctx->props.gsi_read_event_ring_rp(&ev_ctx->props,
@@ -4156,14 +4161,14 @@ int gsi_is_channel_empty(unsigned long chan_hdl, bool *is_empty)
 		rp_local = ctx->ring.rp_local;
 	}
 
-	if (ctx->props.dir == GSI_CHAN_DIR_FROM_GSI)
+	if (ctx->props.dir == CHAN_DIR_FROM_GSI)
 		*is_empty = (rp_local == rp) ? true : false;
 	else
 		*is_empty = (wp == rp) ? true : false;
 
 	spin_unlock_irqrestore(slock, flags);
 
-	if (ctx->props.dir == GSI_CHAN_DIR_FROM_GSI && ctx->evtr)
+	if (ctx->props.dir == CHAN_DIR_FROM_GSI && ctx->evtr)
 		GSIDBG("ch=%ld ev=%d RP=0x%llx WP=0x%llx RP_LOCAL=0x%llx\n",
 			chan_hdl, ctx->evtr->id, rp, wp, rp_local);
 	else
@@ -5761,6 +5766,17 @@ uint64_t gsi_read_chan_ring_re_fetch_wp(int chan_id, int ee)
 	return wp;
 }
 EXPORT_SYMBOL(gsi_read_chan_ring_re_fetch_wp);
+
+uint32_t gsi_get_outstanding_buffers(int ep_idx)
+{
+	uint32_t outstanding_buffers = 0;
+
+	outstanding_buffers = gsihal_read_reg_n(GSI_GSI_SHRAM_n,
+		((ep_idx * IPA_NUM_BYTES_PER_CHNL_SHRAM_5_5)
+		+ IPA_GSI_OFFSET_WORDS_SCRATCH_FOR_SEQ_HIGH_5_5));
+	return outstanding_buffers;
+}
+EXPORT_SYMBOL_GPL(gsi_get_outstanding_buffers);
 
 enum gsi_chan_prot gsi_get_chan_prot_type(int chan_hdl)
 {

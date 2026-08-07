@@ -3,7 +3,7 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/ip.h>
 #include <linux/ipv6.h>
@@ -637,13 +637,9 @@ int ipa3_send(struct ipa3_sys_context *sys,
 	int i = 0;
 	int j;
 	int result;
-	u32 mem_flag = GFP_ATOMIC;
 	const struct ipa_gsi_ep_config *gsi_ep_cfg;
 	bool send_nop = false;
 	unsigned int max_desc;
-
-	if (unlikely(!in_atomic))
-		mem_flag = GFP_KERNEL;
 
 	gsi_ep_cfg = ipa_get_gsi_ep_info(sys->ep->client);
 	if (unlikely(!gsi_ep_cfg)) {
@@ -2287,9 +2283,11 @@ static int ipa3_teardown_pipe(u32 clnt_hdl)
 		do {
 			usleep_range(95, 105);
 		} while (atomic_read(&ep->sys->curr_polling_state));
-
-		napi_disable(ep->sys->napi_obj);
-		netif_napi_del(ep->sys->napi_obj);
+		if (ipa3_ctx->rmnet_napi_enable) {
+			napi_disable(ep->sys->napi_obj);
+			netif_napi_del(ep->sys->napi_obj);
+			ipa3_ctx->rmnet_napi_enable = false;
+		}
 	}
 
 	result = ipa3_reset_gsi_channel(clnt_hdl);
@@ -2392,6 +2390,8 @@ int ipa_tx_dp(enum ipa_client_type dst, struct sk_buff *skb,
 	const struct ipa_gsi_ep_config *gsi_ep;
 	int data_idx;
 	unsigned int max_desc;
+	enum ipa_client_type type;
+	const char *devname = "";
 
 	if (unlikely(!ipa3_ctx)) {
 		IPAERR("IPA3 driver was not initialized\n");
@@ -2432,6 +2432,12 @@ int ipa_tx_dp(enum ipa_client_type dst, struct sk_buff *skb,
 			dst_ep_idx = -1;
 	}
 
+	if (atomic_read(&ipa3_ctx->is_suspend_mode_enabled)) {
+		atomic_set(&ipa3_ctx->is_suspend_mode_enabled, 0);
+		type = ipa3_get_client_by_pipe(src_ep_idx);
+		IPAERR("Client %s woke up the system\n", ipa_clients_strings[type]);
+	}
+
 	sys = ipa3_ctx->ep[src_ep_idx].sys;
 
 	if (!sys || !sys->ep->valid) {
@@ -2439,7 +2445,10 @@ int ipa_tx_dp(enum ipa_client_type dst, struct sk_buff *skb,
 		goto fail_pipe_not_valid;
 	}
 
-	trace_ipa_tx_dp(skb,sys->ep->client);
+	if (skb && skb->dev)
+		devname = skb->dev->name;
+
+	trace_ipa_tx_dp(skb, devname, sys->ep->client);
 	num_frags = skb_shinfo(skb)->nr_frags;
 	/*
 	 * make sure TLV FIFO supports the needed frags.
@@ -3947,6 +3956,8 @@ static int ipa3_lan_rx_pyld_hdlr(struct sk_buff *skb,
 	unsigned long unused = IPA_GENERIC_RX_BUFF_BASE_SZ - used;
 	struct ipa3_tx_pkt_wrapper *tx_pkt = NULL;
 	unsigned long ptr;
+	enum ipa_client_type type;
+	const char *devname = "";
 
 	IPA_DUMP_BUFF(skb->data, 0, skb->len);
 
@@ -4045,6 +4056,16 @@ begin:
 		IPADBG_LOW("STATUS opcode=%d src=%d dst=%d len=%d\n",
 				status.status_opcode, status.endp_src_idx,
 				status.endp_dest_idx, status.pkt_len);
+		if (atomic_read(&ipa3_ctx->is_suspend_mode_enabled)) {
+			atomic_set(&ipa3_ctx->is_suspend_mode_enabled, 0);
+			type = ipa3_get_client_by_pipe(status.endp_src_idx);
+			IPAERR("Client %s woke up the system\n", ipa_clients_strings[type]);
+
+			if (skb && skb->dev)
+				devname = skb->dev->name;
+
+			trace_ipa_tx_dp(skb, devname, sys->ep->client);
+		}
 		if (sys->status_stat) {
 			sys->status_stat->status[sys->status_stat->curr] =
 				status;
@@ -4058,6 +4079,7 @@ begin:
 		case IPAHAL_PKT_STATUS_OPCODE_PACKET:
 		case IPAHAL_PKT_STATUS_OPCODE_SUSPENDED_PACKET:
 		case IPAHAL_PKT_STATUS_OPCODE_PACKET_2ND_PASS:
+		case IPAHAL_PKT_STATUS_OPCODE_DCMP:
 			break;
 		case IPAHAL_PKT_STATUS_OPCODE_NEW_FRAG_RULE:
 			IPAERR_RL("Frag packets received on lan consumer\n");
@@ -6956,7 +6978,7 @@ static int ipa_gsi_setup_transfer_ring(struct ipa3_ep_context *ep,
 	else
 		gsi_channel_props.prot = GSI_CHAN_PROT_GPI;
 	if (IPA_CLIENT_IS_PROD(ep->client)) {
-		gsi_channel_props.dir = GSI_CHAN_DIR_TO_GSI;
+		gsi_channel_props.dir = CHAN_DIR_TO_GSI;
 		if(ep->client == IPA_CLIENT_APPS_WAN_PROD ||
 		   ep->client == IPA_CLIENT_APPS_LAN_PROD ||
 		   ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_PROD)
@@ -6964,7 +6986,7 @@ static int ipa_gsi_setup_transfer_ring(struct ipa3_ep_context *ep,
 		else
 			gsi_channel_props.tx_poll = false;
 	} else {
-		gsi_channel_props.dir = GSI_CHAN_DIR_FROM_GSI;
+		gsi_channel_props.dir = CHAN_DIR_FROM_GSI;
 		if (ep->sys)
 			gsi_channel_props.max_re_expected = ep->sys->rx_pool_sz;
 	}
@@ -7431,7 +7453,7 @@ int ipa_gsi_ch20_wa(void)
 
 	memset(&gsi_channel_props, 0, sizeof(gsi_channel_props));
 	gsi_channel_props.prot = GSI_CHAN_PROT_GPI;
-	gsi_channel_props.dir = GSI_CHAN_DIR_TO_GSI;
+	gsi_channel_props.dir = CHAN_DIR_TO_GSI;
 	gsi_channel_props.evt_ring_hdl = ~0;
 	gsi_channel_props.re_size = GSI_CHAN_RE_SIZE_16B;
 	gsi_channel_props.ring_len = 4 * gsi_channel_props.re_size;

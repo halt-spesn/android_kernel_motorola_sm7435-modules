@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,9 @@
 #include "wlan_hdd_cfr.h"
 #include "wlan_roam_debug.h"
 #include "wma_api.h"
+#ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+#include "hif_main.h"
+#endif
 
 void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -146,6 +149,36 @@ void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter)
 	hdd_place_marker(adapter, "DISCONNECTED", NULL);
 }
 
+/**
+ * hdd_reset_sta_keep_alive_interval() - Reset STA keep alive interval
+ * @adapter: HDD adapter pointer.
+ * @hdd_ctx: HDD context pointer.
+ *
+ * Return: None.
+ */
+static void
+hdd_reset_sta_keep_alive_interval(struct hdd_adapter *adapter,
+				  struct hdd_context *hdd_ctx)
+{
+	enum QDF_OPMODE device_mode = adapter->device_mode;
+	uint32_t keep_alive_interval;
+
+	if (adapter->keep_alive_interval)
+		return;
+
+	if (device_mode != QDF_STA_MODE) {
+		hdd_debug("Not supported for device mode %s = ",
+			  device_mode_to_string(device_mode));
+		return;
+	}
+
+	wlan_hdd_save_sta_keep_alive_interval(adapter, 0);
+	ucfg_mlme_get_sta_keep_alive_period(hdd_ctx->psoc,
+					    &keep_alive_interval);
+	hdd_vdev_send_sta_keep_alive_interval(adapter, hdd_ctx,
+					      keep_alive_interval);
+}
+
 void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 						  struct wlan_objmgr_vdev *vdev)
 {
@@ -200,6 +233,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 
 	hdd_nud_reset_tracking(adapter);
 	hdd_reset_limit_off_chan(adapter);
+	hdd_reset_sta_keep_alive_interval(adapter, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
 }
@@ -562,6 +596,24 @@ QDF_STATUS hdd_cm_napi_serialize_control(bool action)
 }
 
 #ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
+static inline
+uint16_t hdd_cm_get_perf_cpu_mask(void)
+{
+	int perf_cpu_cluster = hif_get_perf_cluster_bitmap();
+	int package_id;
+	unsigned int cpus;
+	uint16_t cpu_mask = 0;
+
+	qdf_for_each_online_cpu(cpus) {
+		package_id = qdf_topology_physical_package_id(cpus);
+		if (package_id >= 0 &&
+		    QDF_HAS_PARAM(perf_cpu_cluster, package_id))
+			cpu_mask |= (uint16_t)(1u << cpus);
+	}
+
+	return cpu_mask;
+}
+
 QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
 {
 	struct wlan_core_minfreq req;
@@ -576,7 +628,8 @@ QDF_STATUS hdd_cm_perfd_set_cpufreq(bool action)
 	if (action) {
 		req.magic    = WLAN_CORE_MINFREQ_MAGIC;
 		req.reserved = 0; /* unused */
-		req.coremask = 0x00ff;/* big and little cluster */
+		/* only perf cluster */
+		req.coremask = hdd_cm_get_perf_cpu_mask();
 		req.freq     = 0xfff;/* set to max freq */
 	} else {
 		req.magic    = WLAN_CORE_MINFREQ_MAGIC;
