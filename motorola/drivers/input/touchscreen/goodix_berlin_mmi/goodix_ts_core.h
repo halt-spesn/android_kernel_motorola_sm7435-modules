@@ -48,7 +48,6 @@
 #define GOODIX_MAX_PEN_KEY 				2
 #define GOODIX_PEN_MAX_TILT				90
 #define GOODIX_CFG_MAX_SIZE				4096
-#define GOODIX_FW_MAX_SIEZE				(300 * 1024)
 #define GOODIX_MAX_STR_LABLE_LEN		64
 #define GOODIX_MAX_FRAMEDATA_LEN		1700
 #define GOODIX_GESTURE_DATA_LEN			16
@@ -62,7 +61,6 @@
 #define GOODIX_RETRY_5					5
 #define GOODIX_RETRY_10					10
 
-#define TS_DEFAULT_FIRMWARE				"goodix_firmware.bin"
 #define TS_DEFAULT_CFG_BIN 				"goodix_cfg_group.bin"
 
 #define PINCTRL_STYLUS_CLK_ACTIVE		"stylus_clk_active"
@@ -294,7 +292,6 @@ struct goodix_module {
  * @swap_axis: whether swaw x y axis
  * @panel_max_x/y/w/p: resolution and size
  * @pannel_key_map: key map
- * @fw_name: name of the firmware image
  */
 struct goodix_ts_board_data {
 	char ic_name[GOODIX_MAX_STR_LABLE_LEN];
@@ -314,7 +311,6 @@ struct goodix_ts_board_data {
 	unsigned int panel_max_p; /*pressure*/
 
 	bool pen_enable;
-	char fw_name[GOODIX_MAX_STR_LABLE_LEN];
 	char cfg_bin_name[GOODIX_MAX_STR_LABLE_LEN];
 	char stylus_clk_src[GOODIX_MAX_STR_LABLE_LEN]; /*stylus clock source*/
 
@@ -331,22 +327,10 @@ struct goodix_ts_board_data {
 	bool stowed_mode_ctrl;
 	bool gesture_wait_pm;
 	bool pocket_mode_ctrl;
-	bool fw_upgrade_drv;
 	bool avdd_set;
 #ifdef CONFIG_GTP_MULTI_CONFIG
 	const char *panel_supplier;
 #endif
-};
-
-enum goodix_fw_update_mode {
-	UPDATE_MODE_DEFAULT = 0,
-	UPDATE_MODE_FORCE = (1<<0), /* force update mode */
-	UPDATE_MODE_BLOCK = (1<<1), /* update in block mode */
-	UPDATE_MODE_FLASH_CFG = (1<<2), /* reflash config */
-	UPDATE_MODE_SRC_SYSFS = (1<<4), /* firmware file from sysfs */
-	UPDATE_MODE_SRC_HEAD = (1<<5), /* firmware file from head file */
-	UPDATE_MODE_SRC_REQUEST = (1<<6), /* request firmware */
-	UPDATE_MODE_SRC_ARGS = (1<<7), /* firmware data from function args */
 };
 
 #define MAX_CMD_DATA_LEN 10
@@ -382,9 +366,6 @@ enum ts_request_type {
 
 /* notifier event */
 enum ts_notify_event {
-	NOTIFY_FWUPDATE_START,
-	NOTIFY_FWUPDATE_FAILED,
-	NOTIFY_FWUPDATE_SUCCESS,
 	NOTIFY_SUSPEND,
 	NOTIFY_RESUME,
 	NOTIFY_ESD_OFF,
@@ -576,7 +557,6 @@ struct goodix_ts_core {
 	bool tools_ctrl_sync;
 
 	struct wakeup_source *gesture_wakelock;
-	struct notifier_block ts_notifier;
 	struct goodix_ts_esd ts_esd;
 #ifdef CONFIG_GTP_ENABLE_PM_QOS
 	struct pm_qos_request goodix_pm_qos;
@@ -594,11 +574,8 @@ struct goodix_ts_core {
 
 	/* touchscreen_mmi */
 	struct ts_mmi_class_methods *imports;
-	int (*set_fw_name)(char* fw_name);
-	int update_status;
 	int gesture_enabled;
 	const char *supplier;
-	bool need_update_cfg;
 #ifdef CONFIG_GTP_FOD
 	unsigned char gesture_type;
 	int zerotap_data[1];
@@ -640,7 +617,6 @@ struct goodix_ts_core {
 /* external module structures */
 enum goodix_ext_priority {
 	EXTMOD_PRIO_RESERVED = 0,
-	EXTMOD_PRIO_FWUPDATE,
 	EXTMOD_PRIO_GESTURE,
 	EXTMOD_PRIO_HOTKNOT,
 	EXTMOD_PRIO_DBGTOOL,
@@ -778,10 +754,6 @@ int is_risk_data(const u8 *data, int size);
 u32 goodix_get_file_config_id(u8 *ic_config);
 void goodix_rotate_abcd2cbad(int tx, int rx, s16 *data);
 int goodix_gesture_enable(int enable);
-
-int goodix_fw_update_init(struct goodix_ts_core *core_data);
-void goodix_fw_update_uninit(void);
-int goodix_do_fw_update(struct goodix_ic_config *ic_config, int mode);
 
 int goodix_get_ic_type(struct device_node *node);
 int gesture_module_init(void);

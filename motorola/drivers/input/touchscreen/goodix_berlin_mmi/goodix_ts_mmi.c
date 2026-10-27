@@ -1267,16 +1267,6 @@ static int goodix_ts_mmi_methods_get_poweron(struct device *dev, void *idata) {
 	return 0;
 }
 
-static int goodix_ts_mmi_methods_get_flashprog(struct device *dev, void *idata) {
-	struct platform_device *pdev;
-	struct goodix_ts_core *core_data;
-
-	GET_GOODIX_DATA(dev);
-
-	TO_INT(idata) = core_data->update_status;
-	return 0;
-}
-
 static int goodix_ts_mmi_methods_drv_irq(struct device *dev, int state) {
 	int ret = -ENODEV;
 	struct platform_device *pdev;
@@ -1305,29 +1295,6 @@ static int goodix_ts_mmi_methods_reset(struct device *dev, int type) {
 	if (core_data->hw_ops->reset)
 		ret = core_data->hw_ops->reset(core_data, GOODIX_NORMAL_RESET_DELAY_MS);
 	return ret;
-}
-
-static int goodix_ts_firmware_update(struct device *dev, char *fwname) {
-	int ret = -ENODEV;
-	struct platform_device *pdev;
-	struct goodix_ts_core *core_data;
-
-	GET_GOODIX_DATA(dev);
-
-	ts_info("HW request update fw, %s", fwname);
-	/* set firmware image name */
-	if (core_data->set_fw_name)
-		core_data->set_fw_name(fwname);
-
-	if (false == core_data->board_data.fw_upgrade_drv) {
-		ts_info("upgrade fw by sh");
-		ret = goodix_do_fw_update(core_data->ic_configs[CONFIG_TYPE_NORMAL],
-					UPDATE_MODE_SRC_REQUEST | UPDATE_MODE_BLOCK | UPDATE_MODE_FORCE);
-	}
-	if (ret)
-		ts_err("failed do fw update");
-
-	return 0;
 }
 
 static int goodix_ts_mmi_methods_power(struct device *dev, int on) {
@@ -1932,7 +1899,6 @@ static struct ts_mmi_methods goodix_ts_mmi_methods = {
 	.get_irq_status = goodix_ts_mmi_methods_get_irq_status,
 	.get_drv_irq = goodix_ts_mmi_methods_get_drv_irq,
 	.get_poweron = goodix_ts_mmi_methods_get_poweron,
-	.get_flashprog = goodix_ts_mmi_methods_get_flashprog,
 	.get_active_region = goodix_ts_mmi_methods_get_active_region,
 	/* SET methods */
 	.reset =  goodix_ts_mmi_methods_reset,
@@ -1945,8 +1911,6 @@ static struct ts_mmi_methods goodix_ts_mmi_methods = {
 #ifdef GOODIX_PALM_SENSOR_EN
 	.palm_set_enable = goodix_ts_mmi_palm_set_enable,
 #endif
-	/* Firmware */
-	.firmware_update = goodix_ts_firmware_update,
 	/* vendor specific attribute group */
 	.extend_attribute_group = goodix_ts_mmi_extend_attribute_group,
 	/* PM callback */

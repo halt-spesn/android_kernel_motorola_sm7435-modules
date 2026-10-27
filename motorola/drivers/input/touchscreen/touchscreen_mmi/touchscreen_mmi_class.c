@@ -116,16 +116,12 @@ TOUCH_MMI_GET_ATTR_RO(productinfo, FMT_STRING);
 TOUCH_MMI_GET_ATTR_RO(build_id, FMT_STRING);
 TOUCH_MMI_GET_ATTR_RO(config_id, FMT_STRING);
 TOUCH_MMI_GET_ATTR_RO(poweron, FMT_INTEGER);
-TOUCH_MMI_GET_ATTR_RO(flashprog, FMT_INTEGER);
 TOUCH_MMI_GET_ATTR_RO(irq_status, FMT_INTEGER);
 TOUCH_MMI_GET_ATTR_RW(drv_irq, FMT_INTEGER);
 TOUCH_MMI_GET_ATTR_RW(suppression, FMT_HEX_INTEGER);
 TOUCH_MMI_GET_ATTR_RW(hold_grip, FMT_HEX_INTEGER);
 TOUCH_MMI_GET_ATTR_RW(hold_distance, FMT_HEX_INTEGER);
 TOUCH_MMI_GET_ATTR_RW(gs_distance, FMT_HEX_INTEGER);
-#ifdef TS_MMI_TOUCH_MULTIWAY_UPDATE_FW
-TOUCH_MMI_GET_ATTR_RW(flash_mode, FMT_INTEGER);
-#endif
 #ifdef TS_MMI_TOUCH_GESTURE_POISON_EVENT
 TOUCH_MMI_GET_ATTR_RW(poison_timeout, FMT_HEX_INTEGER);
 TOUCH_MMI_GET_ATTR_RW(poison_distance, FMT_HEX_INTEGER);
@@ -240,72 +236,6 @@ static ssize_t ts_mmi_hw_irqstat_show(struct device *dev,
 	}
 }
 static DEVICE_ATTR(hw_irqstat, S_IRUGO, ts_mmi_hw_irqstat_show, NULL);
-
-static ssize_t ts_mmi_forcereflash_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct ts_mmi_dev *touch_cdev = dev_get_drvdata(dev);
-	unsigned long value = 0;
-	int err = 0;
-	err = kstrtoul(buf, 10, &value);
-	if (err < 0) {
-		dev_err(dev, "forcereflash: Failed to convert value\n");
-		return -EINVAL;
-	}
-	touch_cdev->forcereflash = value;
-	return size;
-}
-static DEVICE_ATTR(forcereflash, (S_IWUSR | S_IWGRP), NULL, ts_mmi_forcereflash_store);
-
-
-static ssize_t ts_mmi_doreflash_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct ts_mmi_dev *touch_cdev = dev_get_drvdata(dev);
-	char fw_path[TS_MMI_MAX_FW_PATH];
-	char template[TS_MMI_MAX_FW_PATH];
-	int ret = 0;
-
-	if (size > TS_MMI_MAX_FW_PATH) {
-		dev_err(dev, "%s: FW filename is too long\n", __func__);
-		return -EINVAL;
-	}
-
-	if (!touch_cdev->forcereflash) {
-		TRY_TO_GET(vendor, &touch_cdev->vendor);
-		if (strncmp(buf, touch_cdev->vendor,
-			strnlen(touch_cdev->vendor, TS_MMI_MAX_VENDOR_LEN))) {
-			dev_err(dev,
-				"%s: FW does not belong to %s\n",
-				__func__, touch_cdev->vendor);
-			return -EINVAL;
-		}
-
-		TRY_TO_GET(productinfo, &touch_cdev->productinfo);
-		snprintf(template, sizeof(template), "-%s-", touch_cdev->productinfo);
-		if (!strnstr(buf + strnlen(touch_cdev->vendor, TS_MMI_MAX_VENDOR_LEN),
-			template, size)) {
-			dev_err(dev, "%s: FW does not belong to %s\n",
-				__func__, touch_cdev->productinfo);
-			return -EINVAL;
-		}
-	}
-
-	strlcpy(fw_path, buf, size);
-	dev_dbg(dev, "%s: FW filename: %s\n", __func__, fw_path);
-
-	TRY_TO_CALL(firmware_update, fw_path);
-	if (ret < 0) {
-		dev_err(dev, "%s: firmware_update failed %d.\n", __func__, ret);
-		return -EINVAL;
-	}
-
-	dev_info(dev, "%s: update fw from %s, return %d\n",
-		__func__, fw_path, ret);
-
-	return size;
-}
-static DEVICE_ATTR(doreflash, (S_IWUSR | S_IWGRP), NULL, ts_mmi_doreflash_store);
 
 static ssize_t pwr_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t size)
@@ -548,17 +478,11 @@ static struct attribute *sysfs_class_attrs[] = {
 	&dev_attr_build_id.attr,
 	&dev_attr_config_id.attr,
 	&dev_attr_poweron.attr,
-	&dev_attr_flashprog.attr,
 	&dev_attr_irq_status.attr,
 	&dev_attr_hw_irqstat.attr,
 	&dev_attr_ic_ver.attr,
 	&dev_attr_drv_irq.attr,
 	&dev_attr_reset.attr,
-	&dev_attr_forcereflash.attr,
-	&dev_attr_doreflash.attr,
-#ifdef TS_MMI_TOUCH_MULTIWAY_UPDATE_FW
-	&dev_attr_flash_mode.attr,
-#endif
 	&dev_attr_pwr.attr,
 	&dev_attr_pinctrl.attr,
 	&dev_attr_refresh_rate.attr,

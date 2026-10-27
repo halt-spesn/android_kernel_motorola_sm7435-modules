@@ -1068,16 +1068,6 @@ static int goodix_parse_dt(struct device_node *node,
 				sizeof(board_data->iovdd_name));
 	}
 
-	/* get firmware file name */
-	r = of_property_read_string(node, "goodix,firmware-name", &name_tmp);
-	if (!r) {
-		ts_info("firmware name from dt: %s", name_tmp);
-		strncpy(board_data->fw_name, name_tmp, sizeof(board_data->fw_name));
-	} else {
-		ts_info("can't find firmware name, use default: %s", TS_DEFAULT_FIRMWARE);
-		strncpy(board_data->fw_name, TS_DEFAULT_FIRMWARE, sizeof(board_data->fw_name));
-	}
-
 	/* get config file name */
 	r = of_property_read_string(node, "goodix,config-name", &name_tmp);
 	if (!r) {
@@ -1112,12 +1102,10 @@ static int goodix_parse_dt(struct device_node *node,
 					ts_info("matched panel_supplier: %s", board_data->panel_supplier);
 					snprintf(board_data->cfg_bin_name, GOODIX_MAX_STR_LABLE_LEN, "%s_%s",
 						board_data->panel_supplier, TS_DEFAULT_CFG_BIN);
-					snprintf(board_data->fw_name, GOODIX_MAX_STR_LABLE_LEN, "%s_%s",
-						board_data->panel_supplier,TS_DEFAULT_FIRMWARE);
 					core_data->supplier = kstrdup(board_data->panel_supplier, GFP_KERNEL);
 					if (!core_data->supplier)
 						ts_err("Failed to allocate supplier.");
-					ts_info("Use firmware: %s, config: %s", board_data->fw_name, board_data->cfg_bin_name);
+					ts_info("Use config: %s", board_data->cfg_bin_name);
 					break;
 				}
 			}
@@ -1230,12 +1218,6 @@ static int goodix_parse_dt(struct device_node *node,
 		board_data->gesture_wait_pm = false;
 	}
 
-	if (of_property_read_bool(node, "goodix,fw-upgrade-drv")) {
-		ts_info("fw_upgrade_drv");
-		board_data->fw_upgrade_drv = true;
-	} else {
-		board_data->fw_upgrade_drv = false;
-	}
 	return 0;
 }
 #endif
@@ -2016,10 +1998,6 @@ static void goodix_ts_esd_off(struct goodix_ts_core *cd)
  * goodix_esd_notifier_callback - notification callback
  *  under certain condition, we need to turn off/on the esd
  *  protector, we use kernel notify call chain to achieve this.
- *
- *  for example: before firmware update we need to turn off the
- *  esd protector and after firmware update finished, we should
- *  turn on the esd protector.
  */
 static int goodix_esd_notifier_callback(struct notifier_block *nb,
 		unsigned long action, void *data)
@@ -2028,13 +2006,10 @@ static int goodix_esd_notifier_callback(struct notifier_block *nb,
 			struct goodix_ts_esd, esd_notifier);
 
 	switch (action) {
-	case NOTIFY_FWUPDATE_START:
 	case NOTIFY_SUSPEND:
 	case NOTIFY_ESD_OFF:
 		goodix_ts_esd_off(ts_esd->ts_core);
 		break;
-	case NOTIFY_FWUPDATE_FAILED:
-	case NOTIFY_FWUPDATE_SUCCESS:
 	case NOTIFY_RESUME:
 	case NOTIFY_ESD_ON:
 		goodix_ts_esd_on(ts_esd->ts_core);
@@ -2330,56 +2305,6 @@ static int goodix_ts_pm_resume(struct device *dev)
 #endif
 #endif
 
-/**
- * goodix_generic_noti_callback - generic notifier callback
- *  for goodix touch notification event.
- */
-static int goodix_generic_noti_callback(struct notifier_block *self,
-		unsigned long action, void *data)
-{
-	struct goodix_ts_core *cd = container_of(self,
-			struct goodix_ts_core, ts_notifier);
-	const struct goodix_ts_hw_ops *hw_ops = cd->hw_ops;
-	int ret = 0;
-
-	if (cd->init_stage < CORE_INIT_STAGE2)
-		return 0;
-
-	ts_info("notify event type 0x%x", (unsigned int)action);
-	switch (action) {
-	case NOTIFY_FWUPDATE_START:
-		cd->update_status = 1;
-		hw_ops->irq_enable(cd, 0);
-		break;
-	case NOTIFY_FWUPDATE_SUCCESS:
-#ifdef CONFIG_INPUT_TOUCHSCREEN_MMI
-		if (cd->need_update_cfg) {
-			if (goodix_get_config_proc(cd)) {
-				ts_info("no valid ic config found");
-				hw_ops->irq_enable(cd, 1);
-				break;
-			}
-		}
-#endif
-		ret = hw_ops->get_ic_info(cd, &cd->ic_info);
-		if (ret)
-			ts_err("invalid ic info [ignore]");
-		ret = goodix_send_ic_config(cd, CONFIG_TYPE_NORMAL);
-		if (ret)
-			ts_info("failed send normal config[ignore]");
-		fallthrough;
-	case NOTIFY_FWUPDATE_FAILED:
-		if (hw_ops->read_version(cd, &cd->fw_version))
-			ts_info("failed read fw version info[ignore]");
-		hw_ops->irq_enable(cd, 1);
-		cd->update_status = 0;
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
-
 #ifdef GTP_PEN_NOTIFIER
 void set_pen_mode_boot(struct goodix_ts_core *cd)
 {
@@ -2504,10 +2429,10 @@ static int goodix_send_ic_config(struct goodix_ts_core *cd, int type)
 }
 
 /**
- * goodix_later_init_thread - init IC fw and config
+ * goodix_later_init_thread - init IC config and get fw version
  * @data: point to goodix_ts_core
  *
- * This function respond for get fw version and try upgrade fw and config.
+ * This function respond for get config and fw version.
  * Note: when init encounter error, need release all resource allocated here.
  */
 static int goodix_later_init_thread(void *data)
@@ -2516,37 +2441,13 @@ static int goodix_later_init_thread(void *data)
 	struct goodix_ts_core *cd = data;
 	struct goodix_ts_hw_ops *hw_ops = cd->hw_ops;
 
-	/* setp 1: init fw struct add try do fw upgrade */
-	ret = goodix_fw_update_init(cd);
-	if (ret) {
-		ts_err("failed init fw update module");
-		goto err_out;
-	}
-
-	/* setp 2: get config data from config bin */
-	if (goodix_get_config_proc(cd)) {
+	/* step 1: get config data from config bin */
+	if (goodix_get_config_proc(cd))
 		ts_info("no valid ic config found");
-#ifdef CONFIG_INPUT_TOUCHSCREEN_MMI
-		cd->need_update_cfg = 1;
-#endif
-	} else
+	else
 		ts_info("success get valid ic config");
 
-#ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
-	ret = goodix_do_fw_update(cd->ic_configs[CONFIG_TYPE_NORMAL],
-			UPDATE_MODE_BLOCK | UPDATE_MODE_SRC_REQUEST);
-	if (ret)
-		ts_err("failed do fw update");
-#else
-	if (cd->board_data.fw_upgrade_drv) {
-		ts_info("upgrade fw by drv");
-		ret = goodix_do_fw_update(cd->ic_configs[CONFIG_TYPE_NORMAL],
-				UPDATE_MODE_BLOCK | UPDATE_MODE_SRC_REQUEST);
-		if (ret)
-			ts_err("failed do fw update");
-	}
-#endif
-	/* setp3: get fw version and ic_info
+	/* step 2: get fw version and ic_info
 	 * at this step we believe that the ic is in normal mode,
 	 * if the version info is invalid there must have some
 	 * problem we cann't cover so exit init directly.
@@ -2557,7 +2458,7 @@ static int goodix_later_init_thread(void *data)
 #ifdef CONFIG_INPUT_TOUCHSCREEN_MMI
 		goto stage2_init;
 #endif
-		goto uninit_fw;
+		goto err_out;
 	}
 	ret = hw_ops->get_ic_info(cd, &cd->ic_info);
 	if (ret) {
@@ -2565,7 +2466,7 @@ static int goodix_later_init_thread(void *data)
 #ifdef CONFIG_INPUT_TOUCHSCREEN_MMI
 		goto stage2_init;
 #endif
-		goto uninit_fw;
+		goto err_out;
 	}
 
 #ifndef CONFIG_INPUT_TOUCHSCREEN_MMI
@@ -2582,14 +2483,12 @@ stage2_init:
 	ret = goodix_ts_stage2_init(cd);
 	if (ret) {
 		ts_err("stage2 init failed");
-		goto uninit_fw;
+		goto err_out;
 	}
 	cd->init_stage = CORE_INIT_STAGE2;
 
 	return 0;
 
-uninit_fw:
-	goodix_fw_update_uninit();
 err_out:
 	ts_err("stage2 init failed");
 	cd->init_stage = CORE_INIT_FAIL;
@@ -2761,10 +2660,6 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	if (ret)
 		ts_err("failed get goodix stylus clock");
 
-	/* generic notifier callback */
-	core_data->ts_notifier.notifier_call = goodix_generic_noti_callback;
-	goodix_ts_register_notifier(&core_data->ts_notifier);
-
 #ifdef CONFIG_INPUT_TOUCHSCREEN_MMI
 	ts_info("%s:goodix_ts_mmi_dev_register",__func__);
 	ret = goodix_ts_mmi_dev_register(pdev);
@@ -2866,7 +2761,6 @@ static int goodix_ts_remove(struct platform_device *pdev)
 	goodix_ts_mmi_dev_unregister(pdev);
 #endif
 
-	goodix_ts_unregister_notifier(&core_data->ts_notifier);
 #ifdef CONFIG_GTP_DDA_STYLUS
 	goodix_stylus_dda_exit();
 #endif
@@ -2888,7 +2782,6 @@ static int goodix_ts_remove(struct platform_device *pdev)
 			goodix_ts_esd_off(core_data);
 		goodix_ts_unregister_notifier(&ts_esd->esd_notifier);
 
-		goodix_fw_update_uninit();
 		goodix_ts_input_dev_remove(core_data);
 		goodix_ts_pen_dev_remove(core_data);
 		goodix_ts_sysfs_exit(core_data);

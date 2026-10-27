@@ -292,14 +292,6 @@ static void ts_mmi_queued_resume(struct ts_mmi_dev *touch_cdev)
 		dev_dbg(DEV_MMI, "%s: touch pinctrl_on\n", __func__);
 	}
 
-#ifdef TS_MMI_TOUCH_MULTIWAY_UPDATE_FW
-	if (touch_cdev->flash_mode == FW_PARAM_MODE &&\
-			touch_cdev->pdata.fw_load_resume) {
-		dev_info(DEV_MMI, "%s: send sysfs notify to touchUpg\n", __func__);
-		sysfs_notify(touch_cdev->mdata->exports.kobj_notify, NULL, "flash_mode");
-	}
-#endif
-
 	TRY_TO_CALL(pre_resume);
 
 	/* touch IC baseline update always done when IC resume.

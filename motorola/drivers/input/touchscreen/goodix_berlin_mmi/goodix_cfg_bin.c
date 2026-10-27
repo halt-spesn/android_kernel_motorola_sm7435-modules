@@ -314,7 +314,7 @@ static int goodix_get_config_data(struct goodix_ts_core *cd, u8 sensor_id)
 	if (!ret)
 		ts_info("success get reg and cfg info from cfg bin");
 	else
-		ts_err("failed get cfg and reg info, update fw then retry");
+		ts_err("failed get cfg and reg info");
 
 	kfree(cfg_bin.cfg_pkgs);
 err_out:
@@ -325,7 +325,7 @@ err_out:
 int goodix_get_config_proc(struct goodix_ts_core *cd)
 {
 #if defined(CONFIG_INPUT_TOUCHSCREEN_MMI) && defined(CONFIG_GTP_LIMIT_USE_SUPPLIER)
-	if (cd->supplier && (false == cd->board_data.fw_upgrade_drv)) {
+	if (cd->supplier) {
 		snprintf(cd->board_data.cfg_bin_name, GOODIX_MAX_STR_LABLE_LEN, "%s_%s",
 			cd->supplier, TS_DEFAULT_CFG_BIN);
 	}
